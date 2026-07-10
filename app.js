@@ -37,6 +37,15 @@ const state = {
   sourceFilter: "all"
 };
 
+const cvFileDb = {
+  name: "careerWithSandyFiles",
+  store: "cvFiles",
+  version: 1
+};
+
+let cvDbPromise;
+let pendingCvFile = null;
+
 const els = {
   board: document.querySelector("#board"),
   applicationRows: document.querySelector("#applicationRows"),
@@ -93,7 +102,10 @@ function load() {
       id: uid("cv"),
       name: "General CV v1",
       focus: "General applications",
-      link: "",
+      fileName: "",
+      fileType: "",
+      fileSize: 0,
+      hasStoredFile: false,
       updated: today(),
       notes: "Baseline version. Add links to your real CV files when ready."
     }
@@ -142,6 +154,55 @@ function filteredApplications() {
 
 function getCvName(id) {
   return state.cvs.find((cv) => cv.id === id)?.name || "Not selected";
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function openCvDb() {
+  if (cvDbPromise) return cvDbPromise;
+  cvDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(cvFileDb.name, cvFileDb.version);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(cvFileDb.store);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return cvDbPromise;
+}
+
+async function storeCvFile(cvId, file) {
+  const db = await openCvDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(cvFileDb.store, "readwrite");
+    transaction.objectStore(cvFileDb.store).put(file, cvId);
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function getStoredCvFile(cvId) {
+  const db = await openCvDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(cvFileDb.store, "readonly");
+    const request = transaction.objectStore(cvFileDb.store).get(cvId);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteStoredCvFile(cvId) {
+  const db = await openCvDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(cvFileDb.store, "readwrite");
+    transaction.objectStore(cvFileDb.store).delete(cvId);
+    transaction.oncomplete = resolve;
+    transaction.onerror = () => reject(transaction.error);
+  });
 }
 
 function getContactName(id) {
@@ -252,8 +313,9 @@ function renderCvs() {
             <span class="tag">${usedCount} application${usedCount === 1 ? "" : "s"}</span>
             ${cv.updated ? `<span class="tag">Updated ${escapeHtml(cv.updated)}</span>` : ""}
           </div>
-          ${cv.link ? `<p><a href="${escapeHtml(cv.link)}" target="_blank" rel="noreferrer">Open file/link</a></p>` : ""}
+          ${cv.fileName ? `<p>${escapeHtml(cv.fileName)} ${cv.fileSize ? `(${escapeHtml(formatFileSize(cv.fileSize))})` : ""}</p>` : ""}
           <p>${escapeHtml(cv.notes || "")}</p>
+          ${cv.hasStoredFile ? `<button class="secondary-action open-cv-file" data-id="${cv.id}" type="button">Open CV</button>` : ""}
           <button class="secondary-action edit-cv" data-id="${cv.id}" type="button">Edit</button>
         </article>
       `;
@@ -340,10 +402,14 @@ function fillJobForm(job = {}) {
 }
 
 function fillCvForm(cv = {}) {
+  pendingCvFile = null;
   document.querySelector("#cvId").value = cv.id || "";
   document.querySelector("#cvName").value = cv.name || "";
   document.querySelector("#cvFocus").value = cv.focus || "";
-  document.querySelector("#cvLink").value = cv.link || "";
+  document.querySelector("#cvFile").value = "";
+  document.querySelector("#cvFileName").textContent = cv.fileName
+    ? `Current file: ${cv.fileName}${cv.fileSize ? ` (${formatFileSize(cv.fileSize)})` : ""}`
+    : "No file selected yet.";
   document.querySelector("#cvUpdated").value = cv.updated || today();
   document.querySelector("#cvNotes").value = cv.notes || "";
   document.querySelector("#deleteCvButton").style.visibility = cv.id ? "visible" : "hidden";
@@ -473,6 +539,11 @@ document.addEventListener("click", (event) => {
     fillContactForm(person);
     els.contactDialog.showModal();
   }
+
+  const openCvButton = event.target.closest(".open-cv-file");
+  if (openCvButton) {
+    openStoredCv(openCvButton.dataset.id);
+  }
 });
 
 jobForm.addEventListener("submit", (event) => {
@@ -501,14 +572,22 @@ jobForm.addEventListener("submit", (event) => {
   els.jobDialog.close();
 });
 
-cvForm.addEventListener("submit", (event) => {
+cvForm.addEventListener("submit", async (event) => {
   if (event.submitter?.value === "cancel") return;
   event.preventDefault();
+  const id = document.querySelector("#cvId").value || uid("cv");
+  const existing = state.cvs.find((cv) => cv.id === id) || {};
+  if (pendingCvFile) {
+    await storeCvFile(id, pendingCvFile);
+  }
   const item = {
-    id: document.querySelector("#cvId").value || uid("cv"),
+    id,
     name: document.querySelector("#cvName").value,
     focus: document.querySelector("#cvFocus").value,
-    link: document.querySelector("#cvLink").value,
+    fileName: pendingCvFile?.name || existing.fileName || "",
+    fileType: pendingCvFile?.type || existing.fileType || "",
+    fileSize: pendingCvFile?.size || existing.fileSize || 0,
+    hasStoredFile: Boolean(pendingCvFile || existing.hasStoredFile),
     updated: document.querySelector("#cvUpdated").value,
     notes: document.querySelector("#cvNotes").value
   };
@@ -545,8 +624,9 @@ document.querySelector("#deleteJobButton").addEventListener("click", () => {
   els.jobDialog.close();
 });
 
-document.querySelector("#deleteCvButton").addEventListener("click", () => {
+document.querySelector("#deleteCvButton").addEventListener("click", async () => {
   const id = document.querySelector("#cvId").value;
+  await deleteStoredCvFile(id);
   state.cvs = state.cvs.filter((cv) => cv.id !== id);
   state.applications = state.applications.map((job) => job.cvVersion === id ? { ...job, cvVersion: "" } : job);
   save();
@@ -582,6 +662,27 @@ document.querySelector("#exportButton").addEventListener("click", exportCsv);
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importCsv(event.target.files[0]);
 });
+
+document.querySelector("#cvFile").addEventListener("change", (event) => {
+  pendingCvFile = event.target.files[0] || null;
+  document.querySelector("#cvFileName").textContent = pendingCvFile
+    ? `Selected: ${pendingCvFile.name} (${formatFileSize(pendingCvFile.size)})`
+    : "No file selected yet.";
+});
+
+async function openStoredCv(cvId) {
+  const cv = state.cvs.find((item) => item.id === cvId);
+  const file = await getStoredCvFile(cvId);
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.download = cv?.fileName || "cv";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 
 let sandyMessageIndex = -1;
 let sandyBubbleTimer;

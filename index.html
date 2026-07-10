@@ -43,10 +43,6 @@
 
       <main class="main">
         <header class="topbar">
-          <div>
-            <p class="eyebrow">Today</p>
-            <h2 id="todayHeading">Cool water career dashboard</h2>
-          </div>
           <div class="search-wrap">
             <label for="searchInput">Search</label>
             <input id="searchInput" type="search" placeholder="Role, company, source, skill...">
@@ -145,7 +141,7 @@
           <label>Applied date<input id="appliedDate" type="date"></label>
           <label>Next action<input id="nextAction" placeholder="Follow up, tailor CV, prep interview"></label>
           <label>Next action date<input id="nextActionDate" type="date"></label>
-          <label>CV version<select id="cvVersion"></select></label>
+          <label>CV used for this application<select id="cvVersion"></select></label>
           <label>Contact<select id="contactId"></select></label>
         </div>
         <label class="full-label">Job description / keywords<textarea id="description" rows="5"></textarea></label>
@@ -169,8 +165,14 @@
         <div class="form-grid">
           <label>Name<input id="cvName" required placeholder="Frontend CV v3"></label>
           <label>Role focus<input id="cvFocus" placeholder="Frontend, analyst, product"></label>
-          <label>File/link<input id="cvLink" placeholder="Path, Drive link, or GitHub URL"></label>
           <label>Last updated<input id="cvUpdated" type="date"></label>
+        </div>
+        <div class="file-picker-row">
+          <label class="local-file-button">
+            Choose local CV file
+            <input id="cvFile" type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+          </label>
+          <p id="cvFileName">No file selected yet.</p>
         </div>
         <label class="full-label">Key changes<textarea id="cvNotes" rows="4"></textarea></label>
         <div class="dialog-actions">

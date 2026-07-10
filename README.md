@@ -5,7 +5,7 @@ A personal web app for tracking job applications, job links, CV versions, contac
 ## What It Does
 
 - Tracks every job opportunity with role, company, link, source, salary, location, notes, and status.
-- Keeps a CV vault so each application can point to the exact CV version you sent.
+- Keeps a CV vault so each application can point to the exact local CV file/version you sent.
 - Stores recruiter, referral, hiring manager, and alumni contacts.
 - Shows a Kanban board for the pipeline: saved, preparing, applied, interviewing, and closed.
 - Highlights follow-ups when a next action is due or an application is older than seven days.

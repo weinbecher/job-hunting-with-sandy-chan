@@ -163,7 +163,7 @@ button {
 .topbar {
   min-width: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 24px;
   align-items: end;
 }
@@ -464,6 +464,36 @@ label {
   margin-top: 16px;
 }
 
+.file-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.local-file-button {
+  display: inline-flex;
+  width: auto;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #6c92d8, #9b9ad8);
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.local-file-button input {
+  display: none;
+}
+
+#cvFileName {
+  margin: 0;
+  color: var(--muted);
+}
+
 .danger {
   border: 1px solid #d7d8ec;
   color: var(--red);
@@ -617,7 +647,8 @@ a {
   }
 
   .table-toolbar,
-  .reminder {
+  .reminder,
+  .file-picker-row {
     display: grid;
   }
 
