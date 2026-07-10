@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Job Search Command Center</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary">
+        <div class="brand">
+          <span class="brand-mark">JS</span>
+          <div>
+            <h1>Job Search</h1>
+            <p>Personal tracker</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Views">
+          <button class="nav-tab active" data-view="board" type="button">Board</button>
+          <button class="nav-tab" data-view="list" type="button">Applications</button>
+          <button class="nav-tab" data-view="documents" type="button">CV Vault</button>
+          <button class="nav-tab" data-view="contacts" type="button">Contacts</button>
+        </nav>
+
+        <section class="sidebar-section">
+          <h2>Quick Add</h2>
+          <button class="primary-action" id="addJobButton" type="button">+ New application</button>
+          <button class="secondary-action" id="addCvButton" type="button">+ CV version</button>
+          <button class="secondary-action" id="addContactButton" type="button">+ Contact</button>
+        </section>
+
+        <section class="sidebar-section">
+          <h2>Data</h2>
+          <button class="secondary-action" id="exportButton" type="button">Export CSV</button>
+          <label class="file-button">
+            Import CSV
+            <input id="importInput" type="file" accept=".csv">
+          </label>
+        </section>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Today</p>
+            <h2 id="todayHeading">Application pipeline</h2>
+          </div>
+          <div class="search-wrap">
+            <label for="searchInput">Search</label>
+            <input id="searchInput" type="search" placeholder="Role, company, source, skill...">
+          </div>
+        </header>
+
+        <section class="metrics" aria-label="Job search metrics">
+          <article>
+            <span id="metricActive">0</span>
+            <p>Active</p>
+          </article>
+          <article>
+            <span id="metricApplied">0</span>
+            <p>Applied</p>
+          </article>
+          <article>
+            <span id="metricInterviews">0</span>
+            <p>Interviews</p>
+          </article>
+          <article>
+            <span id="metricResponse">0%</span>
+            <p>Response rate</p>
+          </article>
+        </section>
+
+        <section class="reminders" id="remindersPanel" aria-label="Follow up reminders"></section>
+
+        <section class="view active" id="boardView" aria-label="Kanban board">
+          <div class="board" id="board"></div>
+        </section>
+
+        <section class="view" id="listView" aria-label="Application list">
+          <div class="table-toolbar">
+            <select id="statusFilter" aria-label="Filter by status"></select>
+            <select id="sourceFilter" aria-label="Filter by source"></select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Company</th>
+                  <th>Status</th>
+                  <th>Applied</th>
+                  <th>CV</th>
+                  <th>Next action</th>
+                </tr>
+              </thead>
+              <tbody id="applicationRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="documentsView" aria-label="CV vault">
+          <div class="section-heading">
+            <h2>CV Vault</h2>
+            <p>Track the exact resume version you send for each role.</p>
+          </div>
+          <div class="vault-grid" id="cvGrid"></div>
+        </section>
+
+        <section class="view" id="contactsView" aria-label="Contacts">
+          <div class="section-heading">
+            <h2>Contacts</h2>
+            <p>Recruiters, referrals, hiring managers, alumni, and follow-ups.</p>
+          </div>
+          <div class="contact-grid" id="contactGrid"></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="jobDialog">
+      <form method="dialog" id="jobForm">
+        <div class="dialog-head">
+          <h2 id="jobDialogTitle">New application</h2>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+        </div>
+        <input id="jobId" type="hidden">
+        <div class="form-grid">
+          <label>Role title<input id="role" required></label>
+          <label>Company<input id="company" required></label>
+          <label>Job link<input id="jobLink" type="url" placeholder="https://"></label>
+          <label>Source<input id="source" placeholder="LinkedIn, referral, company site"></label>
+          <label>Status<select id="status"></select></label>
+          <label>Location<input id="location" placeholder="London, remote, hybrid"></label>
+          <label>Salary<input id="salary" placeholder="Optional"></label>
+          <label>Applied date<input id="appliedDate" type="date"></label>
+          <label>Next action<input id="nextAction" placeholder="Follow up, tailor CV, prep interview"></label>
+          <label>Next action date<input id="nextActionDate" type="date"></label>
+          <label>CV version<select id="cvVersion"></select></label>
+          <label>Contact<select id="contactId"></select></label>
+        </div>
+        <label class="full-label">Job description / keywords<textarea id="description" rows="5"></textarea></label>
+        <label class="full-label">Notes<textarea id="notes" rows="5"></textarea></label>
+        <div class="dialog-actions">
+          <button class="danger" id="deleteJobButton" type="button">Delete</button>
+          <span></span>
+          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="primary-action" id="saveJobButton" value="default" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="cvDialog">
+      <form method="dialog" id="cvForm">
+        <div class="dialog-head">
+          <h2>CV version</h2>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+        </div>
+        <input id="cvId" type="hidden">
+        <div class="form-grid">
+          <label>Name<input id="cvName" required placeholder="Frontend CV v3"></label>
+          <label>Role focus<input id="cvFocus" placeholder="Frontend, analyst, product"></label>
+          <label>File/link<input id="cvLink" placeholder="Path, Drive link, or GitHub URL"></label>
+          <label>Last updated<input id="cvUpdated" type="date"></label>
+        </div>
+        <label class="full-label">Key changes<textarea id="cvNotes" rows="4"></textarea></label>
+        <div class="dialog-actions">
+          <button class="danger" id="deleteCvButton" type="button">Delete</button>
+          <span></span>
+          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="primary-action" value="default" type="submit">Save CV</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="contactDialog">
+      <form method="dialog" id="contactForm">
+        <div class="dialog-head">
+          <h2>Contact</h2>
+          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+        </div>
+        <input id="personId" type="hidden">
+        <div class="form-grid">
+          <label>Name<input id="personName" required></label>
+          <label>Company<input id="personCompany"></label>
+          <label>Role<input id="personRole" placeholder="Recruiter, referral, hiring manager"></label>
+          <label>Email / LinkedIn<input id="personLink"></label>
+          <label>Last contact<input id="lastContact" type="date"></label>
+          <label>Next follow-up<input id="personNextDate" type="date"></label>
+        </div>
+        <label class="full-label">Notes<textarea id="personNotes" rows="4"></textarea></label>
+        <div class="dialog-actions">
+          <button class="danger" id="deleteContactButton" type="button">Delete</button>
+          <span></span>
+          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="primary-action" value="default" type="submit">Save contact</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
