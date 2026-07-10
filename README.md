@@ -1,4 +1,4 @@
-# Job Search Command Center
+# Career with Sandy
 
 A personal web app for tracking job applications, job links, CV versions, contacts, follow-ups, and outcomes.
 
