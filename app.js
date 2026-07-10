@@ -209,6 +209,129 @@ function getContactName(id) {
   return state.contacts.find((person) => person.id === id)?.name || "No contact";
 }
 
+function cvIdForName(name) {
+  if (!name) return "";
+  let cv = state.cvs.find((item) => item.name === name);
+  if (!cv) {
+    cv = {
+      id: uid("cv"),
+      name,
+      focus: name,
+      fileName: "",
+      fileType: "",
+      fileSize: 0,
+      hasStoredFile: false,
+      updated: today(),
+      notes: "Imported from Sophia job-search pipeline. Choose the local CV file when it is ready."
+    };
+    state.cvs.push(cv);
+  }
+  return cv.id;
+}
+
+function contactIdForPipeline(row) {
+  if (!row.Referral_or_Contact) return "";
+  const name = row.Referral_or_Contact.split(" - ")[0].trim();
+  let person = state.contacts.find((item) => item.name === name && item.company === row.Company);
+  if (!person) {
+    person = {
+      id: uid("person"),
+      name,
+      company: row.Company,
+      role: row.Referral_or_Contact.replace(name, "").replace(/^ - /, "") || "Contact",
+      link: row.Referral_or_Contact.includes("@") ? `mailto:${row.Referral_or_Contact.split(" ").find((part) => part.includes("@"))}` : "",
+      lastContact: "",
+      nextDate: row.Next_Action_Due || "",
+      notes: [row.Referral_or_Contact, row.Networking_Status].filter(Boolean).join("\n")
+    };
+    state.contacts.push(person);
+  }
+  return person.id;
+}
+
+function mapPipelineStatus(status) {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized.includes("deadline") || normalized.includes("closed") || normalized.includes("archive")) return "closed";
+  if (normalized.includes("interview")) return "interviewing";
+  if (normalized.includes("applied")) return "applied";
+  if (normalized.includes("ready")) return "preparing";
+  return "saved";
+}
+
+function fieldLine(label, value) {
+  return value ? `${label}: ${value}` : "";
+}
+
+function pipelineToApplication(row) {
+  const cvVersion = cvIdForName(row.CV_Version);
+  const contactId = contactIdForPipeline(row);
+  return {
+    id: `sophia-${row.Job_ID}`,
+    sourceId: row.Job_ID,
+    role: row.Role_Title || "",
+    company: row.Company || "",
+    jobLink: row.Job_Link || "",
+    source: row.Source || "",
+    status: mapPipelineStatus(row.Status),
+    location: [row.Location, row.Country, row.Work_Model].filter(Boolean).join(" | "),
+    salary: row.Salary || "",
+    appliedDate: row.Applied_Date || "",
+    nextAction: row.Next_Action || "",
+    nextActionDate: row.Next_Action_Due || row.Follow_Up_Date || "",
+    cvVersion,
+    contactId,
+    description: [
+      fieldLine("Role family", row.Role_Family),
+      fieldLine("Seniority", row.Seniority),
+      fieldLine("Key requirements", row.Key_Requirements),
+      fieldLine("Match evidence", row.Match_Evidence),
+      fieldLine("Skill gaps", row.Skill_Gaps)
+    ].filter(Boolean).join("\n\n"),
+    notes: [
+      fieldLine("Pipeline ID", row.Job_ID),
+      fieldLine("Priority", row.Priority),
+      fieldLine("Original status", row.Status),
+      fieldLine("Date found", row.Date_Found),
+      fieldLine("Deadline", row.Application_Deadline),
+      fieldLine("Match score /10", row.Match_Score_10),
+      fieldLine("Interest score /10", row.Interest_Score_10),
+      fieldLine("Visa feasibility /10", row.Visa_Feasibility_10),
+      fieldLine("Urgency score /10", row.Urgency_Score_10),
+      fieldLine("Application effort /5", row.Application_Effort_5),
+      fieldLine("Strategic score /100", row.Strategic_Score_100),
+      fieldLine("Visa sponsorship", row.Visa_Sponsorship),
+      fieldLine("Relocation support", row.Relocation_Support),
+      fieldLine("Japanese requirement", row.Japanese_Requirement),
+      fieldLine("Cover letter", row.Cover_Letter_Status),
+      fieldLine("Networking", row.Networking_Status),
+      fieldLine("Interview stage", row.Interview_Stage),
+      fieldLine("Outcome", row.Outcome),
+      fieldLine("Notes", row.Notes)
+    ].filter(Boolean).join("\n")
+  };
+}
+
+function importSophiaPipeline({ silent = false } = {}) {
+  const rows = window.SOPHIA_PIPELINE || [];
+  if (!rows.length) return 0;
+  const imported = rows.map(pipelineToApplication);
+  const importedIds = new Set(imported.map((job) => job.sourceId));
+  state.applications = state.applications
+    .filter((job) => !importedIds.has(job.sourceId) && job.company !== "Example Co")
+    .concat(imported);
+  localStorage.setItem("careerWithSandySophiaPipelineImported", "true");
+  save();
+  render();
+  if (!silent) {
+    const bubble = document.querySelector("#sandyBubble");
+    bubble.textContent = `Imported ${imported.length} Sophia pipeline jobs.`;
+    bubble.classList.add("show");
+    clearTimeout(sandyBubbleTimer);
+    sandyBubbleTimer = setTimeout(() => bubble.classList.remove("show"), 5200);
+  }
+  return imported.length;
+}
+
 function groupForStatus(status) {
   if (["offer", "rejected", "ghosted", "closed"].includes(status)) return "closed";
   return status || "saved";
@@ -659,6 +782,9 @@ els.sourceFilter.addEventListener("change", (event) => {
 });
 
 document.querySelector("#exportButton").addEventListener("click", exportCsv);
+document.querySelector("#importSophiaButton").addEventListener("click", () => {
+  importSophiaPipeline();
+});
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importCsv(event.target.files[0]);
 });
@@ -699,4 +825,8 @@ document.querySelector("#sandyFloat").addEventListener("click", () => {
 });
 
 load();
-render();
+if (!localStorage.getItem("careerWithSandySophiaPipelineImported")) {
+  importSophiaPipeline({ silent: true });
+} else {
+  render();
+}
