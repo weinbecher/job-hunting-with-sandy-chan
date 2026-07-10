@@ -17,6 +17,17 @@ const STATUS_LABELS = {
   closed: "Closed"
 };
 
+const SANDY_MESSAGES = [
+  "One application at a time. Sandy believes in your quiet consistency.",
+  "You do not need to be perfect today. You just need the next tiny step.",
+  "That CV version is part of the journey. Keep going.",
+  "A no is data, not a verdict. Sandy is still sitting with you.",
+  "Follow up gently. Future you will be grateful.",
+  "You are building momentum, even when it feels invisible.",
+  "Save the link now. Make it beautiful later.",
+  "Your next opportunity can start from one calm click."
+];
+
 const state = {
   applications: [],
   cvs: [],
@@ -570,6 +581,20 @@ els.sourceFilter.addEventListener("change", (event) => {
 document.querySelector("#exportButton").addEventListener("click", exportCsv);
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importCsv(event.target.files[0]);
+});
+
+let sandyMessageIndex = -1;
+let sandyBubbleTimer;
+
+document.querySelector("#sandyFloat").addEventListener("click", () => {
+  const bubble = document.querySelector("#sandyBubble");
+  sandyMessageIndex = (sandyMessageIndex + 1) % SANDY_MESSAGES.length;
+  bubble.textContent = SANDY_MESSAGES[sandyMessageIndex];
+  bubble.classList.add("show");
+  clearTimeout(sandyBubbleTimer);
+  sandyBubbleTimer = setTimeout(() => {
+    bubble.classList.remove("show");
+  }, 5200);
 });
 
 load();

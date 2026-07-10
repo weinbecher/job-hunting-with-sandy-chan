@@ -1,18 +1,20 @@
 :root {
   color-scheme: light;
-  --ink: #0f2d44;
-  --muted: #5f7790;
-  --line: #b9d8ea;
-  --panel: rgba(248, 253, 255, 0.9);
-  --soft: #edf8ff;
-  --accent: #2f80c1;
-  --accent-strong: #135d92;
-  --aqua: #72c7e7;
-  --ice: #f3fbff;
-  --deep: #0c4a6e;
-  --red: #9c4e6a;
-  --blue: #176b9e;
-  --shadow: 0 22px 60px rgba(23, 107, 158, 0.16);
+  --ink: #20324f;
+  --muted: #6a7692;
+  --line: #c8d3f0;
+  --panel: rgba(250, 252, 255, 0.91);
+  --soft: #eef5ff;
+  --accent: #6c92d8;
+  --accent-strong: #496fad;
+  --sky: #82a9e6;
+  --periwinkle: #9b9ad8;
+  --ice: #f7f6f2;
+  --mist: #c8d4f4;
+  --leaf: #91aa74;
+  --red: #8f5a82;
+  --blue: #5278bf;
+  --shadow: 0 22px 60px rgba(82, 120, 191, 0.16);
   font-family: "Avenir Next", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -23,9 +25,9 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 18% 8%, rgba(132, 203, 241, 0.72), transparent 24rem),
-    radial-gradient(circle at 88% 2%, rgba(206, 239, 255, 0.86), transparent 28rem),
-    linear-gradient(135deg, #d8efff 0%, #f5fbff 45%, #e7f5ff 100%);
+    radial-gradient(circle at 18% 8%, rgba(130, 169, 230, 0.58), transparent 24rem),
+    radial-gradient(circle at 88% 2%, rgba(200, 212, 244, 0.78), transparent 28rem),
+    linear-gradient(135deg, #dcecff 0%, #fafcff 46%, #edf3ff 100%);
   color: var(--ink);
 }
 
@@ -48,14 +50,14 @@ button {
 
 .sidebar {
   background:
-    linear-gradient(180deg, rgba(11, 74, 111, 0.98), rgba(20, 111, 158, 0.94)),
-    #0b4a6f;
+    linear-gradient(180deg, rgba(57, 91, 151, 0.98), rgba(88, 124, 190, 0.94)),
+    #395b97;
   color: #f8fdff;
   padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 28px;
-  box-shadow: 18px 0 45px rgba(39, 125, 161, 0.15);
+  box-shadow: 18px 0 45px rgba(82, 120, 191, 0.16);
 }
 
 .brand {
@@ -70,8 +72,8 @@ button {
   border-radius: 8px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #f8fdff, #b8e4ff);
-  color: #0c4a6e;
+  background: linear-gradient(135deg, #fdfcf8, #d9e5ff);
+  color: #496fad;
   font-weight: 800;
   box-shadow: 0 12px 28px rgba(4, 45, 66, 0.18);
 }
@@ -90,37 +92,8 @@ button {
 
 .brand p,
 .sidebar-section h2 {
-  color: #d7efff;
+  color: #e1e9ff;
   font-size: 0.85rem;
-}
-
-.sandy-card {
-  display: grid;
-  gap: 10px;
-  background: rgba(221, 243, 255, 0.16);
-  border: 1px solid rgba(210, 237, 255, 0.32);
-  border-radius: 8px;
-  padding: 14px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-.sandy-card img {
-  width: min(150px, 80%);
-  justify-self: center;
-  filter: drop-shadow(0 18px 26px rgba(6, 42, 61, 0.24));
-}
-
-.sandy-card p {
-  margin: 0;
-  color: #f5fbff;
-  line-height: 1.45;
-}
-
-.sandy-kicker {
-  color: #d9f2ff !important;
-  font-weight: 800;
-  font-size: 0.78rem;
-  text-transform: uppercase;
 }
 
 .nav-tabs {
@@ -141,13 +114,13 @@ button {
 
 .nav-tab {
   background: transparent;
-  color: #e6f6ff;
+  color: #f0f5ff;
 }
 
 .nav-tab.active {
-  background: rgba(208, 236, 255, 0.2);
+  background: rgba(222, 233, 255, 0.22);
   color: #ffffff;
-  box-shadow: inset 4px 0 0 #9ddeff;
+  box-shadow: inset 4px 0 0 #c8d4f4;
 }
 
 .sidebar-section {
@@ -156,16 +129,16 @@ button {
 }
 
 .primary-action {
-  background: linear-gradient(135deg, #1f78b4, #67c7ee);
+  background: linear-gradient(135deg, #6c92d8, #9b9ad8);
   color: #ffffff;
   font-weight: 700;
-  box-shadow: 0 12px 24px rgba(39, 125, 161, 0.22);
+  box-shadow: 0 12px 24px rgba(82, 120, 191, 0.24);
 }
 
 .secondary-action,
 .file-button {
-  background: #edf8ff;
-  color: #18313f;
+  background: #eef5ff;
+  color: #20324f;
 }
 
 .sidebar .secondary-action,
@@ -196,7 +169,7 @@ button {
 }
 
 .eyebrow {
-  color: #176b9e;
+  color: #5278bf;
   font-weight: 800;
   letter-spacing: 0;
   margin: 0 0 4px;
@@ -209,7 +182,7 @@ button {
   font-size: clamp(1.6rem, 3vw, 2.6rem);
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 700;
-  color: #0f2d44;
+  color: #20324f;
 }
 
 .search-wrap {
@@ -237,8 +210,8 @@ textarea {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: #72c7e7;
-  box-shadow: 0 0 0 4px rgba(114, 199, 231, 0.24);
+  border-color: #9b9ad8;
+  box-shadow: 0 0 0 4px rgba(155, 154, 216, 0.22);
   outline: 0;
 }
 
@@ -264,7 +237,7 @@ textarea {
 .metrics span {
   font-size: 1.8rem;
   font-weight: 800;
-  color: #176b9e;
+  color: #5278bf;
 }
 
 .metrics p,
@@ -285,8 +258,8 @@ textarea {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  background: rgba(241, 249, 255, 0.94);
-  border: 1px solid #b9d8ea;
+  background: rgba(250, 252, 255, 0.94);
+  border: 1px solid #c8d3f0;
   border-radius: 8px;
   padding: 12px 14px;
 }
@@ -311,7 +284,7 @@ textarea {
 }
 
 .column {
-  background: rgba(229, 245, 255, 0.76);
+  background: rgba(230, 240, 255, 0.78);
   border: 1px solid var(--line);
   border-radius: 8px;
   min-height: 380px;
@@ -343,7 +316,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
-  box-shadow: 0 12px 26px rgba(39, 125, 161, 0.12);
+  box-shadow: 0 12px 26px rgba(82, 120, 191, 0.12);
 }
 
 .job-card {
@@ -368,19 +341,19 @@ textarea {
 .tag {
   border-radius: 999px;
   padding: 4px 8px;
-  background: #edf8ff;
-  color: #315f80;
+  background: #eef5ff;
+  color: #536481;
   font-size: 0.78rem;
 }
 
 .tag.warn {
-  background: #e4f3ff;
-  color: #176b9e;
+  background: #e9ecfb;
+  color: #615fa3;
 }
 
 .tag.good {
-  background: #dff4ff;
-  color: #135d92;
+  background: #eef4e8;
+  color: #6f875a;
 }
 
 .table-toolbar {
@@ -439,7 +412,7 @@ dialog {
 }
 
 dialog::backdrop {
-  background: rgba(11, 74, 111, 0.48);
+  background: rgba(57, 91, 151, 0.48);
 }
 
 form {
@@ -492,9 +465,9 @@ label {
 }
 
 .danger {
-  border: 1px solid #c8ddec;
+  border: 1px solid #d7d8ec;
   color: var(--red);
-  background: #f3fbff;
+  background: #fafcff;
   border-radius: 8px;
   min-height: 40px;
   padding: 10px 12px;
@@ -502,7 +475,7 @@ label {
 
 .empty-state {
   color: var(--muted);
-  border: 1px dashed #9dcbe8;
+  border: 1px dashed #b7c6ec;
   border-radius: 8px;
   padding: 18px;
   background: rgba(255, 255, 255, 0.5);
@@ -510,6 +483,92 @@ label {
 
 a {
   color: var(--blue);
+}
+
+.sandy-float-wrap {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.sandy-float {
+  width: 96px;
+  height: 96px;
+  border: 1px solid rgba(200, 211, 240, 0.95);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.95), rgba(220, 232, 255, 0.82) 62%, rgba(155, 154, 216, 0.62));
+  box-shadow: 0 18px 44px rgba(82, 120, 191, 0.24);
+  display: grid;
+  place-items: center;
+  padding: 7px;
+  pointer-events: auto;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  animation: sandyFloat 4.5s ease-in-out infinite;
+}
+
+.sandy-float:hover,
+.sandy-float:focus-visible {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: 0 22px 52px rgba(82, 120, 191, 0.32);
+}
+
+.sandy-float img {
+  width: 78px;
+  height: 78px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px rgba(15, 45, 68, 0.16));
+}
+
+.sandy-bubble {
+  position: relative;
+  width: min(270px, calc(100vw - 48px));
+  border: 1px solid rgba(184, 199, 236, 0.95);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(250, 252, 255, 0.97);
+  color: var(--ink);
+  box-shadow: 0 18px 42px rgba(82, 120, 191, 0.18);
+  font-weight: 700;
+  line-height: 1.38;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
+}
+
+.sandy-bubble.show {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.sandy-bubble::after {
+  content: "";
+  position: absolute;
+  right: 36px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  border-right: 1px solid rgba(184, 199, 236, 0.95);
+  border-bottom: 1px solid rgba(184, 199, 236, 0.95);
+  background: rgba(250, 252, 255, 0.97);
+  transform: rotate(45deg);
+}
+
+@keyframes sandyFloat {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 0 -8px;
+  }
 }
 
 .link-button {
@@ -564,5 +623,20 @@ a {
 
   .dialog-actions {
     grid-template-columns: 1fr;
+  }
+
+  .sandy-float-wrap {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .sandy-float {
+    width: 78px;
+    height: 78px;
+  }
+
+  .sandy-float img {
+    width: 62px;
+    height: 62px;
   }
 }
