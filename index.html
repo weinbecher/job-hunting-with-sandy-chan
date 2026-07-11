@@ -8,7 +8,35 @@
   </head>
   <body>
     <div class="hydrangea-garden" aria-hidden="true"></div>
-    <div class="app-shell">
+
+    <div class="auth-gate" id="authGate" hidden>
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="assets/sandy-hydrangea-under.png" alt="">
+          <div>
+            <h1>Job Hunting with Sandy</h1>
+            <p>Sign in to reach your tracker.</p>
+          </div>
+        </div>
+
+        <div class="auth-config-notice" id="authConfigNotice" hidden>
+          <h2>Almost there — connect Supabase</h2>
+          <p>This app needs a free Supabase project before it can store data. Open
+            <code>config.js</code> and paste your project URL and anon key, then reload.
+            See <code>README.md</code> for the full setup steps.</p>
+        </div>
+
+        <form class="auth-form" id="authForm">
+          <label>Email
+            <input id="authEmail" type="email" required placeholder="you@example.com" autocomplete="email">
+          </label>
+          <button class="primary-action" type="submit" id="authSubmit">Send me a magic link</button>
+          <p class="auth-status" id="authStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <div class="app-shell" hidden>
       <button class="menu-toggle" id="openSidebarButton" type="button">☰ Menu</button>
       <aside class="sidebar" aria-label="Primary">
         <div class="sidebar-head">
@@ -40,10 +68,17 @@
           <h2>Data</h2>
           <button class="secondary-action" id="exportButton" type="button">Export CSV</button>
           <button class="secondary-action" id="importSophiaButton" type="button">Import Sophia pipeline</button>
+          <button class="secondary-action" id="importBrowserButton" type="button">Import from this browser</button>
           <label class="file-button">
             Import CSV
             <input id="importInput" type="file" accept=".csv">
           </label>
+        </section>
+
+        <section class="sidebar-section">
+          <h2>Account</h2>
+          <p class="account-email" id="accountEmail"></p>
+          <button class="secondary-action" id="signOutButton" type="button">Sign out</button>
         </section>
       </aside>
 
@@ -244,7 +279,8 @@
       </form>
     </dialog>
 
+    <script src="config.js"></script>
     <script src="seed-data.js"></script>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

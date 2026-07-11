@@ -998,3 +998,136 @@ a {
     height: 128px;
   }
 }
+
+/* Auth gate ---------------------------------------------------------------- */
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(130, 169, 230, 0.4), transparent 26rem),
+    linear-gradient(135deg, #dcecff 0%, #fafcff 46%, #edf3ff 100%);
+}
+
+.auth-gate[hidden] {
+  display: none;
+}
+
+.auth-card {
+  width: min(440px, 100%);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  padding: 28px 26px;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.auth-brand img {
+  width: 62px;
+  height: 62px;
+  object-fit: contain;
+}
+
+.auth-brand h1 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--ink);
+}
+
+.auth-brand p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.auth-config-notice {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: rgba(255, 246, 224, 0.6);
+}
+
+.auth-config-notice[hidden] {
+  display: none;
+}
+
+.auth-config-notice h2 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--accent-strong);
+}
+
+.auth-config-notice p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.auth-config-notice code {
+  background: rgba(108, 146, 216, 0.16);
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.auth-form[hidden] {
+  display: none;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.auth-form input {
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-line);
+  background: var(--glass);
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.auth-status {
+  margin: 2px 0 0;
+  min-height: 1.2em;
+  font-size: 0.88rem;
+  color: var(--accent-strong);
+}
+
+.auth-status.error {
+  color: var(--red);
+}
+
+.account-email {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.app-shell[hidden] {
+  display: none;
+}

@@ -1,3 +1,5 @@
+import * as data from "./data.js";
+
 const STATUS_GROUPS = [
   { id: "saved", label: "Saved" },
   { id: "preparing", label: "Preparing" },
@@ -61,13 +63,6 @@ const state = {
   tagFilter: "all"
 };
 
-const cvFileDb = {
-  name: "careerWithSandyFiles",
-  store: "cvFiles",
-  version: 1
-};
-
-let cvDbPromise;
 let pendingCvFile = null;
 let draggedJobId = null;
 
@@ -121,10 +116,6 @@ function formatClock() {
     minute: "2-digit",
     second: "2-digit"
   }).format(now);
-}
-
-function save() {
-  localStorage.setItem("jobSearchCommandCenter", JSON.stringify(state));
 }
 
 function setSidebarClosed(isClosed) {
@@ -188,51 +179,11 @@ function compareJobs(first, second) {
   return `${first.company} ${first.role}`.localeCompare(`${second.company} ${second.role}`);
 }
 
-function load() {
-  const stored = localStorage.getItem("jobSearchCommandCenter");
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    state.applications = parsed.applications || [];
-    state.cvs = parsed.cvs || [];
-    state.contacts = parsed.contacts || [];
-    return;
-  }
-
-  state.cvs = [
-    {
-      id: uid("cv"),
-      name: "General CV v1",
-      focus: "General applications",
-      fileName: "",
-      fileType: "",
-      fileSize: 0,
-      hasStoredFile: false,
-      updated: today(),
-      notes: "Baseline version. Add links to your real CV files when ready."
-    }
-  ];
-  state.contacts = [];
-  state.applications = [
-    {
-      id: uid("job"),
-      role: "Example Product Analyst",
-      company: "Example Co",
-      jobLink: "https://example.com/job",
-      source: "LinkedIn",
-      status: "saved",
-      location: "London / hybrid",
-      salary: "",
-      appliedDate: "",
-      nextAction: "Tailor CV",
-      nextActionDate: today(),
-      tags: ["Example"],
-      cvVersion: state.cvs[0].id,
-      contactId: "",
-      description: "Paste job descriptions here to track keywords.",
-      notes: "Replace this sample with a real opportunity."
-    }
-  ];
-  save();
+async function load() {
+  const { applications, cvs, contacts } = await data.fetchAll();
+  state.applications = applications;
+  state.cvs = cvs;
+  state.contacts = contacts;
 }
 
 function filteredApplications() {
@@ -264,49 +215,6 @@ function formatFileSize(bytes) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function openCvDb() {
-  if (cvDbPromise) return cvDbPromise;
-  cvDbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(cvFileDb.name, cvFileDb.version);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(cvFileDb.store);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-  return cvDbPromise;
-}
-
-async function storeCvFile(cvId, file) {
-  const db = await openCvDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(cvFileDb.store, "readwrite");
-    transaction.objectStore(cvFileDb.store).put(file, cvId);
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-  });
-}
-
-async function getStoredCvFile(cvId) {
-  const db = await openCvDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(cvFileDb.store, "readonly");
-    const request = transaction.objectStore(cvFileDb.store).get(cvId);
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function deleteStoredCvFile(cvId) {
-  const db = await openCvDb();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(cvFileDb.store, "readwrite");
-    transaction.objectStore(cvFileDb.store).delete(cvId);
-    transaction.oncomplete = resolve;
-    transaction.onerror = () => reject(transaction.error);
-  });
 }
 
 function getContactName(id) {
@@ -416,27 +324,55 @@ function pipelineToApplication(row) {
   };
 }
 
-function importSophiaPipeline({ silent = false } = {}) {
+async function importSophiaPipeline() {
   const rows = window.SOPHIA_PIPELINE || [];
-  const version = window.SOPHIA_PIPELINE_VERSION || "legacy";
   if (!rows.length) return 0;
+
+  // pipelineToApplication appends any newly-seen CVs/contacts to state as a side
+  // effect, so snapshot the existing ids first to know which ones are new.
+  const existingCvIds = new Set(state.cvs.map((cv) => cv.id));
+  const existingContactIds = new Set(state.contacts.map((person) => person.id));
   const imported = rows.map(pipelineToApplication);
   const importedIds = new Set(imported.map((job) => job.sourceId));
+  const newCvs = state.cvs.filter((cv) => !existingCvIds.has(cv.id));
+  const newContacts = state.contacts.filter((person) => !existingContactIds.has(person.id));
+
   state.applications = state.applications
     .filter((job) => !importedIds.has(job.sourceId) && job.company !== "Example Co")
     .concat(imported);
-  localStorage.setItem("careerWithSandySophiaPipelineImported", "true");
-  localStorage.setItem("careerWithSandySophiaPipelineVersion", version);
-  save();
+
+  await data.upsertCvs(newCvs);
+  await data.upsertContacts(newContacts);
+  await data.upsertApplications(imported);
   render();
-  if (!silent) {
-    const bubble = document.querySelector("#sandyBubble");
-    bubble.textContent = `Imported ${imported.length} Sophia pipeline jobs.`;
-    bubble.classList.add("show");
-    clearTimeout(sandyBubbleTimer);
-    sandyBubbleTimer = setTimeout(() => bubble.classList.remove("show"), 5200);
-  }
+  showBubble(`Imported ${imported.length} Sophia pipeline jobs.`);
   return imported.length;
+}
+
+// Reads any legacy browser data (from before the Supabase move) and copies it into
+// the account. CV file blobs cannot be migrated automatically — re-upload those.
+async function importFromBrowser() {
+  const stored = localStorage.getItem("jobSearchCommandCenter");
+  if (!stored) {
+    showBubble("No saved browser data found on this device.");
+    return;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    showBubble("Could not read the saved browser data.");
+    return;
+  }
+  const cvs = (parsed.cvs || []).map((cv) => ({ ...cv, hasStoredFile: false, storagePath: "" }));
+  const contacts = parsed.contacts || [];
+  const applications = parsed.applications || [];
+  await data.upsertCvs(cvs);
+  await data.upsertContacts(contacts);
+  await data.upsertApplications(applications);
+  await load();
+  render();
+  showBubble(`Imported ${applications.length} jobs from this browser.`);
 }
 
 function groupForStatus(status) {
@@ -739,7 +675,7 @@ function exportCsv() {
 
 function importCsv(file) {
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     const lines = String(reader.result).split(/\r?\n/).filter(Boolean);
     const imported = lines.slice(1).map((line) => {
       const cells = line.match(/("([^"]|"")*"|[^,]+)/g) || [];
@@ -764,7 +700,7 @@ function importCsv(file) {
       };
     });
     state.applications = [...imported, ...state.applications];
-    save();
+    await data.upsertApplications(imported);
     render();
   };
   reader.readAsText(file);
@@ -895,7 +831,7 @@ els.board.addEventListener("dragleave", (event) => {
   column.classList.remove("drag-over");
 });
 
-els.board.addEventListener("drop", (event) => {
+els.board.addEventListener("drop", async (event) => {
   const column = event.target.closest(".column");
   if (!column) return;
   event.preventDefault();
@@ -907,13 +843,14 @@ els.board.addEventListener("drop", (event) => {
   if (nextStatus === "applied" && !job.appliedDate) {
     job.appliedDate = today();
   }
-  save();
   render();
+  await data.upsertApplication(job);
 });
 
-jobForm.addEventListener("submit", (event) => {
+jobForm.addEventListener("submit", async (event) => {
   if (event.submitter?.value === "cancel") return;
   event.preventDefault();
+  const existing = state.applications.find((job) => job.id === document.querySelector("#jobId").value);
   const item = {
     id: document.querySelector("#jobId").value || uid("job"),
     role: document.querySelector("#role").value,
@@ -930,12 +867,13 @@ jobForm.addEventListener("submit", (event) => {
     cvVersion: document.querySelector("#cvVersion").value,
     contactId: document.querySelector("#contactId").value,
     description: document.querySelector("#description").value,
-    notes: document.querySelector("#notes").value
+    notes: document.querySelector("#notes").value,
+    sourceId: existing?.sourceId || ""
   };
   upsert(state.applications, item);
-  save();
   render();
   els.jobDialog.close();
+  await data.upsertApplication(item);
 });
 
 cvForm.addEventListener("submit", async (event) => {
@@ -943,8 +881,9 @@ cvForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const id = document.querySelector("#cvId").value || uid("cv");
   const existing = state.cvs.find((cv) => cv.id === id) || {};
+  let storagePath = existing.storagePath || "";
   if (pendingCvFile) {
-    await storeCvFile(id, pendingCvFile);
+    storagePath = await data.uploadCvFile(id, pendingCvFile);
   }
   const item = {
     id,
@@ -954,16 +893,17 @@ cvForm.addEventListener("submit", async (event) => {
     fileType: pendingCvFile?.type || existing.fileType || "",
     fileSize: pendingCvFile?.size || existing.fileSize || 0,
     hasStoredFile: Boolean(pendingCvFile || existing.hasStoredFile),
+    storagePath,
     updated: document.querySelector("#cvUpdated").value,
     notes: document.querySelector("#cvNotes").value
   };
   upsert(state.cvs, item);
-  save();
   render();
   els.cvDialog.close();
+  await data.upsertCv(item);
 });
 
-contactForm.addEventListener("submit", (event) => {
+contactForm.addEventListener("submit", async (event) => {
   if (event.submitter?.value === "cancel") return;
   event.preventDefault();
   const item = {
@@ -977,36 +917,42 @@ contactForm.addEventListener("submit", (event) => {
     notes: document.querySelector("#personNotes").value
   };
   upsert(state.contacts, item);
-  save();
   render();
   els.contactDialog.close();
+  await data.upsertContact(item);
 });
 
-document.querySelector("#deleteJobButton").addEventListener("click", () => {
+document.querySelector("#deleteJobButton").addEventListener("click", async () => {
   const id = document.querySelector("#jobId").value;
   state.applications = state.applications.filter((job) => job.id !== id);
-  save();
   render();
   els.jobDialog.close();
+  await data.deleteApplication(id);
 });
 
 document.querySelector("#deleteCvButton").addEventListener("click", async () => {
   const id = document.querySelector("#cvId").value;
-  await deleteStoredCvFile(id);
-  state.cvs = state.cvs.filter((cv) => cv.id !== id);
+  const cv = state.cvs.find((item) => item.id === id);
+  // Applications that referenced this CV get their reference cleared.
+  const affected = state.applications.filter((job) => job.cvVersion === id);
+  state.cvs = state.cvs.filter((item) => item.id !== id);
   state.applications = state.applications.map((job) => job.cvVersion === id ? { ...job, cvVersion: "" } : job);
-  save();
   render();
   els.cvDialog.close();
+  if (cv?.storagePath) await data.deleteCvFile(cv.storagePath);
+  await data.deleteCv(id);
+  await data.upsertApplications(affected.map((job) => ({ ...job, cvVersion: "" })));
 });
 
-document.querySelector("#deleteContactButton").addEventListener("click", () => {
+document.querySelector("#deleteContactButton").addEventListener("click", async () => {
   const id = document.querySelector("#personId").value;
+  const affected = state.applications.filter((job) => job.contactId === id);
   state.contacts = state.contacts.filter((person) => person.id !== id);
   state.applications = state.applications.map((job) => job.contactId === id ? { ...job, contactId: "" } : job);
-  save();
   render();
   els.contactDialog.close();
+  await data.deleteContact(id);
+  await data.upsertApplications(affected.map((job) => ({ ...job, contactId: "" })));
 });
 
 els.searchInput.addEventListener("input", (event) => {
@@ -1031,7 +977,10 @@ els.tagFilter.addEventListener("change", (event) => {
 
 document.querySelector("#exportButton").addEventListener("click", exportCsv);
 document.querySelector("#importSophiaButton").addEventListener("click", () => {
-  importSophiaPipeline();
+  importSophiaPipeline().catch((error) => showBubble(error.message || "Import failed."));
+});
+document.querySelector("#importBrowserButton").addEventListener("click", () => {
+  importFromBrowser().catch((error) => showBubble(error.message || "Import failed."));
 });
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importCsv(event.target.files[0]);
@@ -1068,21 +1017,27 @@ document.querySelector("#cvFile").addEventListener("change", (event) => {
 
 async function openStoredCv(cvId) {
   const cv = state.cvs.find((item) => item.id === cvId);
-  const file = await getStoredCvFile(cvId);
-  if (!file) return;
-  const url = URL.createObjectURL(file);
+  if (!cv?.storagePath) return;
+  const url = await data.getCvFileUrl(cv.storagePath);
+  if (!url) return;
   const link = document.createElement("a");
   link.href = url;
   link.target = "_blank";
   link.rel = "noreferrer";
-  link.download = cv?.fileName || "cv";
   link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 let sandyMessageIndex = -1;
 let sandyBubbleTimer;
 let sandyDrag = null;
+
+function showBubble(text) {
+  const bubble = document.querySelector("#sandyBubble");
+  bubble.textContent = text;
+  bubble.classList.add("show");
+  clearTimeout(sandyBubbleTimer);
+  sandyBubbleTimer = setTimeout(() => bubble.classList.remove("show"), 5200);
+}
 
 function moveSandyTo(left, top) {
   const wrap = document.querySelector(".sandy-float-wrap");
@@ -1163,13 +1118,77 @@ document.querySelector("#sandyFloat").addEventListener("click", (event) => {
   event.preventDefault();
 });
 
+// --- Auth gate + boot ------------------------------------------------------
+
+const authGate = document.querySelector("#authGate");
+const authForm = document.querySelector("#authForm");
+let booted = false;
+
+async function showApp(session) {
+  authGate.hidden = true;
+  appShell.hidden = false;
+  document.querySelector("#accountEmail").textContent = session.user?.email || "";
+  if (booted) return;
+  booted = true;
+  try {
+    await load();
+    render();
+  } catch (error) {
+    console.error("Failed to load your data:", error);
+    showBubble(error.message || "Could not load your data.");
+  }
+}
+
+function showGate() {
+  booted = false;
+  appShell.hidden = true;
+  authForm.hidden = false;
+  authGate.hidden = false;
+}
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.querySelector("#authEmail").value.trim();
+  const status = document.querySelector("#authStatus");
+  const submit = document.querySelector("#authSubmit");
+  if (!email) return;
+  status.classList.remove("error");
+  status.textContent = "Sending your sign-in link...";
+  submit.disabled = true;
+  try {
+    await data.signInWithEmail(email);
+    status.textContent = "Check your email for a sign-in link.";
+  } catch (error) {
+    status.classList.add("error");
+    status.textContent = error.message || "Could not send the link.";
+  } finally {
+    submit.disabled = false;
+  }
+});
+
+document.querySelector("#signOutButton").addEventListener("click", async () => {
+  await data.signOut();
+});
+
+function initAuth() {
+  if (!data.isConfigured()) {
+    document.querySelector("#authConfigNotice").hidden = false;
+    authForm.hidden = true;
+    authGate.hidden = false;
+    return;
+  }
+  // Defer the async work out of the auth callback to avoid deadlocking the
+  // Supabase auth lock. onAuthChange fires with the initial session on load.
+  data.onAuthChange((session) => {
+    setTimeout(() => {
+      if (session) showApp(session);
+      else showGate();
+    }, 0);
+  });
+}
+
 setSidebarClosed(localStorage.getItem("careerWithSandySidebarClosed") === "true");
 restoreSandyPosition();
 formatClock();
 setInterval(formatClock, 1000);
-load();
-if (localStorage.getItem("careerWithSandySophiaPipelineVersion") !== (window.SOPHIA_PIPELINE_VERSION || "legacy")) {
-  importSophiaPipeline({ silent: true });
-} else {
-  render();
-}
+initAuth();
