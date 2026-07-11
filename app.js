@@ -17,15 +17,38 @@ const STATUS_LABELS = {
   closed: "Closed"
 };
 
+const PRIORITY_ORDER = [
+  "A+",
+  "A",
+  "A-",
+  "A-/B+",
+  "B+",
+  "B",
+  "B-",
+  "C",
+  "Closed / archive"
+];
+
 const SANDY_MESSAGES = [
-  "One application at a time. Sandy believes in your quiet consistency.",
-  "You do not need to be perfect today. You just need the next tiny step.",
-  "That CV version is part of the journey. Keep going.",
-  "A no is data, not a verdict. Sandy is still sitting with you.",
-  "Follow up gently. Future you will be grateful.",
-  "You are building momentum, even when it feels invisible.",
-  "Save the link now. Make it beautiful later.",
-  "Your next opportunity can start from one calm click."
+  "Every champion was once a contender who refused to give up. 🥊",
+  "Remember, the mind is your best muscle. 💪",
+  "All I wanna do is go the distance. 🏁",
+  "You are gonna have to go through hell. Keep going. 🔥",
+  "It ain't about how hard you hit. It is about how hard you can get hit and keep moving forward. 🥊",
+  "Going in one more round when you do not think you can. That is what makes the difference. 🏆",
+  "To beat me, he is going to have to kill me. ❤️",
+  "All I wanna do is go the distance. ⭐",
+  "Time takes everybody out. Make this round count. ⏳",
+  "Life is unfair. Get over it. 🥊",
+  "Nobody owes nobody nothing. You owe yourself. 💙",
+  "Winners are the ones who really listen to the truth of their hearts. ✨",
+  "Life is about how many hits you can take and still keep moving forward. That is how winning is done. 🥊",
+  "Our greatest glory is not in falling, but rising every time we fall. 🌊",
+  "If you know what you are worth, go out and get what you are worth. 🎯",
+  "I do not know if you are special. Only you are gonna know that. 🌟",
+  "The world ain't all sunshine and rainbows. Nobody is gonna hit as hard as life. Keep moving. 🌧️",
+  "Until you start believing in yourself, you ain't gonna have a life. 💫",
+  "Every champion was a contender that refused to give up. 🏆"
 ];
 
 const state = {
@@ -34,7 +57,8 @@ const state = {
   contacts: [],
   query: "",
   statusFilter: "all",
-  sourceFilter: "all"
+  sourceFilter: "all",
+  tagFilter: "all"
 };
 
 const cvFileDb = {
@@ -45,16 +69,18 @@ const cvFileDb = {
 
 let cvDbPromise;
 let pendingCvFile = null;
+let draggedJobId = null;
 
 const els = {
   board: document.querySelector("#board"),
   applicationRows: document.querySelector("#applicationRows"),
   cvGrid: document.querySelector("#cvGrid"),
   contactGrid: document.querySelector("#contactGrid"),
-  remindersPanel: document.querySelector("#remindersPanel"),
   searchInput: document.querySelector("#searchInput"),
   statusFilter: document.querySelector("#statusFilter"),
   sourceFilter: document.querySelector("#sourceFilter"),
+  tagFilter: document.querySelector("#tagFilter"),
+  dashboardClock: document.querySelector("#dashboardClock"),
   metricActive: document.querySelector("#metricActive"),
   metricApplied: document.querySelector("#metricApplied"),
   metricInterviews: document.querySelector("#metricInterviews"),
@@ -67,6 +93,7 @@ const els = {
 const jobForm = document.querySelector("#jobForm");
 const cvForm = document.querySelector("#cvForm");
 const contactForm = document.querySelector("#contactForm");
+const appShell = document.querySelector(".app-shell");
 
 function uid(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -83,8 +110,82 @@ function daysBetween(dateText) {
   return Math.round((now - start) / 86400000);
 }
 
+function formatClock() {
+  const now = new Date();
+  els.dashboardClock.textContent = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).format(now);
+}
+
 function save() {
   localStorage.setItem("jobSearchCommandCenter", JSON.stringify(state));
+}
+
+function setSidebarClosed(isClosed) {
+  appShell.classList.toggle("sidebar-closed", isClosed);
+  localStorage.setItem("careerWithSandySidebarClosed", isClosed ? "true" : "false");
+}
+
+function parseTags(value) {
+  return String(value || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .filter((tag, index, tags) => tags.findIndex((item) => item.toLowerCase() === tag.toLowerCase()) === index);
+}
+
+function tagsText(tags) {
+  return (tags || []).join(", ");
+}
+
+function priorityTag(priority) {
+  const value = String(priority || "").trim();
+  if (!value) return "";
+  return value.split(" - ")[0].trim();
+}
+
+function pipelineTags(row) {
+  const tags = [
+    priorityTag(row.Priority),
+    row.Role_Family ? row.Role_Family.split("/")[0].trim() : "",
+    String(row.Work_Model || "").toLowerCase().includes("remote") ? "Remote" : ""
+  ];
+  return parseTags(tags.join(","));
+}
+
+function priorityRank(job) {
+  const tags = job.tags || [];
+  const exactPriority = tags.find((tag) => PRIORITY_ORDER.includes(tag));
+  if (exactPriority) return PRIORITY_ORDER.indexOf(exactPriority);
+
+  const normalized = tags.map((tag) => tag.toLowerCase());
+  if (normalized.some((tag) => tag.includes("apply first") || tag.includes("apply immediately"))) return 0;
+  if (normalized.some((tag) => tag.includes("interested") || tag.includes("priority"))) return 2;
+  return PRIORITY_ORDER.length;
+}
+
+function extractDateFound(job) {
+  return String(job.notes || "").match(/Date found: (\d{4}-\d{2}-\d{2})/)?.[1] || "";
+}
+
+function sortDateKey(job) {
+  return job.nextActionDate || job.appliedDate || extractDateFound(job) || "9999-12-31";
+}
+
+function compareJobs(first, second) {
+  const priorityDifference = priorityRank(first) - priorityRank(second);
+  if (priorityDifference) return priorityDifference;
+
+  const timeDifference = sortDateKey(first).localeCompare(sortDateKey(second));
+  if (timeDifference) return timeDifference;
+
+  return `${first.company} ${first.role}`.localeCompare(`${second.company} ${second.role}`);
 }
 
 function load() {
@@ -124,6 +225,7 @@ function load() {
       appliedDate: "",
       nextAction: "Tailor CV",
       nextActionDate: today(),
+      tags: ["Example"],
       cvVersion: state.cvs[0].id,
       contactId: "",
       description: "Paste job descriptions here to track keywords.",
@@ -143,13 +245,15 @@ function filteredApplications() {
       job.location,
       job.description,
       job.notes,
+      ...(job.tags || []),
       STATUS_LABELS[job.status]
     ].join(" ").toLowerCase();
     const matchesQuery = !query || haystack.includes(query);
     const matchesStatus = state.statusFilter === "all" || job.status === state.statusFilter;
     const matchesSource = state.sourceFilter === "all" || job.source === state.sourceFilter;
-    return matchesQuery && matchesStatus && matchesSource;
-  });
+    const matchesTag = state.tagFilter === "all" || (job.tags || []).some((tag) => tag === state.tagFilter);
+    return matchesQuery && matchesStatus && matchesSource && matchesTag;
+  }).sort(compareJobs);
 }
 
 function getCvName(id) {
@@ -278,6 +382,7 @@ function pipelineToApplication(row) {
     appliedDate: row.Applied_Date || "",
     nextAction: row.Next_Action || "",
     nextActionDate: row.Next_Action_Due || row.Follow_Up_Date || "",
+    tags: pipelineTags(row),
     cvVersion,
     contactId,
     description: [
@@ -313,6 +418,7 @@ function pipelineToApplication(row) {
 
 function importSophiaPipeline({ silent = false } = {}) {
   const rows = window.SOPHIA_PIPELINE || [];
+  const version = window.SOPHIA_PIPELINE_VERSION || "legacy";
   if (!rows.length) return 0;
   const imported = rows.map(pipelineToApplication);
   const importedIds = new Set(imported.map((job) => job.sourceId));
@@ -320,6 +426,7 @@ function importSophiaPipeline({ silent = false } = {}) {
     .filter((job) => !importedIds.has(job.sourceId) && job.company !== "Example Co")
     .concat(imported);
   localStorage.setItem("careerWithSandySophiaPipelineImported", "true");
+  localStorage.setItem("careerWithSandySophiaPipelineVersion", version);
   save();
   render();
   if (!silent) {
@@ -337,10 +444,65 @@ function groupForStatus(status) {
   return status || "saved";
 }
 
-function statusOptions(selected = "saved") {
-  return Object.entries(STATUS_LABELS)
-    .map(([value, label]) => `<option value="${value}" ${value === selected ? "selected" : ""}>${label}</option>`)
+function statusForColumn(columnId) {
+  return columnId === "closed" ? "closed" : columnId;
+}
+
+function renderStatusTags(selected = "saved") {
+  const current = STATUS_LABELS[selected] ? selected : "saved";
+  const statusInput = document.querySelector("#status");
+  const statusTagRow = document.querySelector("#statusTagRow");
+  statusInput.value = current;
+  statusTagRow.innerHTML = Object.entries(STATUS_LABELS)
+    .map(([value, label]) => `
+      <button class="tag status-choice ${value === current ? "selected" : ""}" data-status="${value}" type="button" role="radio" aria-checked="${value === current}">
+        ${escapeHtml(label)}
+      </button>
+    `)
     .join("");
+}
+
+function setJobTags(tags) {
+  const uniqueTags = parseTags(tagsText(tags));
+  document.querySelector("#jobTags").value = tagsText(uniqueTags);
+  document.querySelector("#jobTagChips").innerHTML = uniqueTags.length
+    ? uniqueTags.map((tag) => `
+      <button class="tag custom-tag removable-tag" data-tag="${escapeHtml(tag)}" type="button" aria-label="Remove ${escapeHtml(tag)}">
+        ${escapeHtml(tag)} <span aria-hidden="true">×</span>
+      </button>
+    `).join("")
+    : '<span class="empty-tag-note">No tags yet</span>';
+}
+
+function addJobTag() {
+  const input = document.querySelector("#tagEntry");
+  const nextTag = input.value.trim();
+  if (!nextTag) return;
+  setJobTags(parseTags(`${document.querySelector("#jobTags").value},${nextTag}`));
+  input.value = "";
+  input.focus();
+}
+
+function countdownInfo(job) {
+  if (job.nextActionDate) {
+    const daysLate = daysBetween(job.nextActionDate);
+    if (daysLate === 0) return { label: "Due today", tone: "due" };
+    if (daysLate > 0) return { label: `${daysLate} day${daysLate === 1 ? "" : "s"} late`, tone: "overdue" };
+    const daysLeft = Math.abs(daysLate);
+    return { label: `${daysLeft} day${daysLeft === 1 ? "" : "s"} left`, tone: "good" };
+  }
+
+  if (job.appliedDate) {
+    const daysSince = daysBetween(job.appliedDate);
+    return { label: `${daysSince} day${daysSince === 1 ? "" : "s"} since applied`, tone: "quiet" };
+  }
+
+  return { label: "No due date", tone: "quiet" };
+}
+
+function countdownTag(job) {
+  const countdown = countdownInfo(job);
+  return `<span class="tag countdown-tag ${countdown.tone}">${escapeHtml(countdown.label)}</span>`;
 }
 
 function escapeHtml(value) {
@@ -366,10 +528,14 @@ function renderMetrics() {
 
 function renderFilters() {
   const sources = [...new Set(state.applications.map((job) => job.source).filter(Boolean))].sort();
+  const tags = [...new Set(state.applications.flatMap((job) => job.tags || []))].sort((a, b) => a.localeCompare(b));
   els.statusFilter.innerHTML = `<option value="all">All statuses</option>${Object.entries(STATUS_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}`;
   els.sourceFilter.innerHTML = `<option value="all">All sources</option>${sources.map((source) => `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`).join("")}`;
+  els.tagFilter.innerHTML = `<option value="all">All tags</option>${tags.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join("")}`;
   els.statusFilter.value = state.statusFilter;
   els.sourceFilter.value = state.sourceFilter;
+  els.tagFilter.value = tags.includes(state.tagFilter) ? state.tagFilter : "all";
+  state.tagFilter = els.tagFilter.value;
 }
 
 function renderBoard() {
@@ -392,7 +558,7 @@ function renderJobCard(job) {
     ? `<span class="tag ${nextDays !== null && nextDays >= 0 ? "warn" : "good"}">${escapeHtml(job.nextActionDate)}</span>`
     : "";
   return `
-    <article class="job-card">
+    <article class="job-card" draggable="true" data-id="${job.id}">
       <div>
         <h4>${escapeHtml(job.role)}</h4>
         <p>${escapeHtml(job.company)}</p>
@@ -401,6 +567,8 @@ function renderJobCard(job) {
         <span class="tag">${escapeHtml(STATUS_LABELS[job.status] || job.status)}</span>
         ${job.source ? `<span class="tag">${escapeHtml(job.source)}</span>` : ""}
         ${nextTag}
+        ${countdownTag(job)}
+        ${(job.tags || []).map((tag) => `<span class="tag custom-tag">${escapeHtml(tag)}</span>`).join("")}
       </div>
       <p>${escapeHtml(job.nextAction || "No next action set")}</p>
       <button class="secondary-action edit-job" data-id="${job.id}" type="button">Open</button>
@@ -416,12 +584,14 @@ function renderRows() {
         <td><button class="link-button edit-job" data-id="${job.id}" type="button">${escapeHtml(job.role)}</button></td>
         <td>${escapeHtml(job.company)}</td>
         <td>${escapeHtml(STATUS_LABELS[job.status] || job.status)}</td>
+        <td>${(job.tags || []).map((tag) => `<span class="tag custom-tag">${escapeHtml(tag)}</span>`).join("")}</td>
+        <td>${countdownTag(job)}</td>
         <td>${escapeHtml(job.appliedDate || "Not yet")}</td>
         <td>${escapeHtml(getCvName(job.cvVersion))}</td>
         <td>${escapeHtml(job.nextAction || "")}</td>
       </tr>
     `).join("")
-    : '<tr><td colspan="6">No applications match your filters.</td></tr>';
+    : '<tr><td colspan="8">No applications match your filters.</td></tr>';
 }
 
 function renderCvs() {
@@ -467,28 +637,8 @@ function renderContacts() {
     : '<div class="empty-state">Add recruiters, referrals, alumni, and hiring managers.</div>';
 }
 
-function renderReminders() {
-  const reminders = state.applications
-    .filter((job) => {
-      if (["offer", "rejected", "closed"].includes(job.status)) return false;
-      const nextDue = job.nextActionDate && daysBetween(job.nextActionDate) >= 0;
-      const oldApplication = job.appliedDate && daysBetween(job.appliedDate) >= 7 && !["interviewing", "offer"].includes(job.status);
-      return nextDue || oldApplication;
-    })
-    .slice(0, 4);
-
-  els.remindersPanel.innerHTML = reminders.length
-    ? reminders.map((job) => `
-      <div class="reminder">
-        <span><strong>${escapeHtml(job.company)}</strong> - ${escapeHtml(job.nextAction || "Follow up")}</span>
-        <button class="secondary-action edit-job" data-id="${job.id}" type="button">Review</button>
-      </div>
-    `).join("")
-    : "";
-}
-
 function renderSelects() {
-  document.querySelector("#status").innerHTML = statusOptions(document.querySelector("#status").value || "saved");
+  renderStatusTags(document.querySelector("#status").value || "saved");
   document.querySelector("#cvVersion").innerHTML = `<option value="">No CV selected</option>${state.cvs.map((cv) => `<option value="${cv.id}">${escapeHtml(cv.name)}</option>`).join("")}`;
   document.querySelector("#contactId").innerHTML = `<option value="">No contact</option>${state.contacts.map((person) => `<option value="${person.id}">${escapeHtml(person.name)}</option>`).join("")}`;
 }
@@ -500,7 +650,6 @@ function render() {
   renderRows();
   renderCvs();
   renderContacts();
-  renderReminders();
   renderSelects();
 }
 
@@ -510,13 +659,16 @@ function fillJobForm(job = {}) {
   document.querySelector("#role").value = job.role || "";
   document.querySelector("#company").value = job.company || "";
   document.querySelector("#jobLink").value = job.jobLink || "";
+  document.querySelector("#openJobLinkButton").disabled = !job.jobLink;
   document.querySelector("#source").value = job.source || "";
-  document.querySelector("#status").innerHTML = statusOptions(job.status || "saved");
+  renderStatusTags(job.status || "saved");
   document.querySelector("#location").value = job.location || "";
   document.querySelector("#salary").value = job.salary || "";
   document.querySelector("#appliedDate").value = job.appliedDate || "";
   document.querySelector("#nextAction").value = job.nextAction || "";
   document.querySelector("#nextActionDate").value = job.nextActionDate || "";
+  document.querySelector("#tagEntry").value = "";
+  setJobTags(job.tags || []);
   document.querySelector("#cvVersion").value = job.cvVersion || "";
   document.querySelector("#contactId").value = job.contactId || "";
   document.querySelector("#description").value = job.description || "";
@@ -557,11 +709,12 @@ function upsert(collection, item) {
 }
 
 function exportCsv() {
-  const headers = ["role", "company", "status", "jobLink", "source", "location", "salary", "appliedDate", "nextAction", "nextActionDate", "cvVersion", "contact", "notes"];
+  const headers = ["role", "company", "status", "tags", "jobLink", "source", "location", "salary", "appliedDate", "nextAction", "nextActionDate", "cvVersion", "contact", "notes"];
   const rows = state.applications.map((job) => [
     job.role,
     job.company,
     STATUS_LABELS[job.status] || job.status,
+    tagsText(job.tags),
     job.jobLink,
     job.source,
     job.location,
@@ -596,17 +749,18 @@ function importCsv(file) {
         role: clean[0] || "",
         company: clean[1] || "",
         status: Object.entries(STATUS_LABELS).find(([, label]) => label === clean[2])?.[0] || "saved",
-        jobLink: clean[3] || "",
-        source: clean[4] || "",
-        location: clean[5] || "",
-        salary: clean[6] || "",
-        appliedDate: clean[7] || "",
-        nextAction: clean[8] || "",
-        nextActionDate: clean[9] || "",
+        tags: parseTags(clean[3] || ""),
+        jobLink: clean[4] || "",
+        source: clean[5] || "",
+        location: clean[6] || "",
+        salary: clean[7] || "",
+        appliedDate: clean[8] || "",
+        nextAction: clean[9] || "",
+        nextActionDate: clean[10] || "",
         cvVersion: "",
         contactId: "",
         description: "",
-        notes: clean[12] || ""
+        notes: clean[13] || ""
       };
     });
     state.applications = [...imported, ...state.applications];
@@ -630,6 +784,21 @@ document.querySelector("#addJobButton").addEventListener("click", () => {
   els.jobDialog.showModal();
 });
 
+document.querySelector("#jobLink").addEventListener("input", (event) => {
+  document.querySelector("#openJobLinkButton").disabled = !event.target.value.trim();
+});
+
+document.querySelector("#openJobLinkButton").addEventListener("click", () => {
+  const value = document.querySelector("#jobLink").value.trim();
+  if (!value) return;
+  const url = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.click();
+});
+
 document.querySelector("#addCvButton").addEventListener("click", () => {
   fillCvForm();
   els.cvDialog.showModal();
@@ -640,15 +809,39 @@ document.querySelector("#addContactButton").addEventListener("click", () => {
   els.contactDialog.showModal();
 });
 
+document.querySelector("#closeSidebarButton").addEventListener("click", () => {
+  setSidebarClosed(true);
+});
+
+document.querySelector("#openSidebarButton").addEventListener("click", () => {
+  setSidebarClosed(false);
+});
+
 document.addEventListener("click", (event) => {
+  const cancelButton = event.target.closest(".dialog-cancel");
+  if (cancelButton) {
+    cancelButton.closest("dialog")?.close();
+    return;
+  }
+
   const jobButton = event.target.closest(".edit-job");
   const cvButton = event.target.closest(".edit-cv");
   const contactButton = event.target.closest(".edit-contact");
+  const jobCard = event.target.closest(".job-card");
+  const interactiveTarget = event.target.closest("button, a, input, select, textarea, label");
 
   if (jobButton) {
     const job = state.applications.find((item) => item.id === jobButton.dataset.id);
     fillJobForm(job);
     els.jobDialog.showModal();
+    return;
+  }
+
+  if (jobCard && !interactiveTarget) {
+    const job = state.applications.find((item) => item.id === jobCard.dataset.id);
+    fillJobForm(job);
+    els.jobDialog.showModal();
+    return;
   }
 
   if (cvButton) {
@@ -669,6 +862,55 @@ document.addEventListener("click", (event) => {
   }
 });
 
+els.board.addEventListener("dragstart", (event) => {
+  const card = event.target.closest(".job-card");
+  if (!card) return;
+  draggedJobId = card.dataset.id;
+  card.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedJobId);
+});
+
+els.board.addEventListener("dragend", () => {
+  draggedJobId = null;
+  document.querySelectorAll(".job-card.dragging, .column.drag-over").forEach((element) => {
+    element.classList.remove("dragging", "drag-over");
+  });
+});
+
+els.board.addEventListener("dragover", (event) => {
+  const column = event.target.closest(".column");
+  if (!column || !draggedJobId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  document.querySelectorAll(".column.drag-over").forEach((element) => {
+    if (element !== column) element.classList.remove("drag-over");
+  });
+  column.classList.add("drag-over");
+});
+
+els.board.addEventListener("dragleave", (event) => {
+  const column = event.target.closest(".column");
+  if (!column || column.contains(event.relatedTarget)) return;
+  column.classList.remove("drag-over");
+});
+
+els.board.addEventListener("drop", (event) => {
+  const column = event.target.closest(".column");
+  if (!column) return;
+  event.preventDefault();
+  const jobId = event.dataTransfer.getData("text/plain") || draggedJobId;
+  const job = state.applications.find((item) => item.id === jobId);
+  if (!job) return;
+  const nextStatus = statusForColumn(column.dataset.status);
+  job.status = nextStatus;
+  if (nextStatus === "applied" && !job.appliedDate) {
+    job.appliedDate = today();
+  }
+  save();
+  render();
+});
+
 jobForm.addEventListener("submit", (event) => {
   if (event.submitter?.value === "cancel") return;
   event.preventDefault();
@@ -684,6 +926,7 @@ jobForm.addEventListener("submit", (event) => {
     appliedDate: document.querySelector("#appliedDate").value,
     nextAction: document.querySelector("#nextAction").value,
     nextActionDate: document.querySelector("#nextActionDate").value,
+    tags: parseTags(document.querySelector("#jobTags").value),
     cvVersion: document.querySelector("#cvVersion").value,
     contactId: document.querySelector("#contactId").value,
     description: document.querySelector("#description").value,
@@ -781,12 +1024,39 @@ els.sourceFilter.addEventListener("change", (event) => {
   render();
 });
 
+els.tagFilter.addEventListener("change", (event) => {
+  state.tagFilter = event.target.value;
+  render();
+});
+
 document.querySelector("#exportButton").addEventListener("click", exportCsv);
 document.querySelector("#importSophiaButton").addEventListener("click", () => {
   importSophiaPipeline();
 });
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importCsv(event.target.files[0]);
+});
+
+document.querySelector("#statusTagRow").addEventListener("click", (event) => {
+  const choice = event.target.closest(".status-choice");
+  if (!choice) return;
+  renderStatusTags(choice.dataset.status);
+});
+
+document.querySelector("#addTagButton").addEventListener("click", addJobTag);
+
+document.querySelector("#tagEntry").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  addJobTag();
+});
+
+document.querySelector("#jobTagChips").addEventListener("click", (event) => {
+  const chip = event.target.closest(".removable-tag");
+  if (!chip) return;
+  const nextTags = parseTags(document.querySelector("#jobTags").value)
+    .filter((tag) => tag !== chip.dataset.tag);
+  setJobTags(nextTags);
 });
 
 document.querySelector("#cvFile").addEventListener("change", (event) => {
@@ -812,8 +1082,36 @@ async function openStoredCv(cvId) {
 
 let sandyMessageIndex = -1;
 let sandyBubbleTimer;
+let sandyDrag = null;
 
-document.querySelector("#sandyFloat").addEventListener("click", () => {
+function moveSandyTo(left, top) {
+  const wrap = document.querySelector(".sandy-float-wrap");
+  const rect = wrap.getBoundingClientRect();
+  const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+  const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+  const nextLeft = Math.min(Math.max(8, left), maxLeft);
+  const nextTop = Math.min(Math.max(8, top), maxTop);
+  wrap.style.left = `${nextLeft}px`;
+  wrap.style.top = `${nextTop}px`;
+  wrap.style.right = "auto";
+  wrap.style.bottom = "auto";
+  localStorage.setItem("jobHuntingWithSandyPosition", JSON.stringify({ left: nextLeft, top: nextTop }));
+}
+
+function restoreSandyPosition() {
+  const stored = localStorage.getItem("jobHuntingWithSandyPosition");
+  if (!stored) return;
+  try {
+    const position = JSON.parse(stored);
+    if (Number.isFinite(position.left) && Number.isFinite(position.top)) {
+      moveSandyTo(position.left, position.top);
+    }
+  } catch {
+    localStorage.removeItem("jobHuntingWithSandyPosition");
+  }
+}
+
+function encourageWithSandy() {
   const bubble = document.querySelector("#sandyBubble");
   sandyMessageIndex = (sandyMessageIndex + 1) % SANDY_MESSAGES.length;
   bubble.textContent = SANDY_MESSAGES[sandyMessageIndex];
@@ -822,10 +1120,55 @@ document.querySelector("#sandyFloat").addEventListener("click", () => {
   sandyBubbleTimer = setTimeout(() => {
     bubble.classList.remove("show");
   }, 5200);
+}
+
+document.querySelector("#sandyFloat").addEventListener("pointerdown", (event) => {
+  const wrap = document.querySelector(".sandy-float-wrap");
+  const rect = wrap.getBoundingClientRect();
+  sandyDrag = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+    moved: false
+  };
+  event.currentTarget.setPointerCapture(event.pointerId);
 });
 
+document.querySelector("#sandyFloat").addEventListener("pointermove", (event) => {
+  if (!sandyDrag || sandyDrag.pointerId !== event.pointerId) return;
+  const distance = Math.hypot(event.clientX - sandyDrag.startX, event.clientY - sandyDrag.startY);
+  if (distance > 4) {
+    sandyDrag.moved = true;
+    document.querySelector(".sandy-float-wrap").classList.add("dragging");
+  }
+  if (!sandyDrag.moved) return;
+  moveSandyTo(event.clientX - sandyDrag.offsetX, event.clientY - sandyDrag.offsetY);
+});
+
+document.querySelector("#sandyFloat").addEventListener("pointerup", (event) => {
+  if (!sandyDrag || sandyDrag.pointerId !== event.pointerId) return;
+  const wasDrag = sandyDrag.moved;
+  document.querySelector(".sandy-float-wrap").classList.remove("dragging");
+  sandyDrag = null;
+  if (!wasDrag) {
+    encourageWithSandy();
+  }
+});
+
+window.addEventListener("resize", restoreSandyPosition);
+
+document.querySelector("#sandyFloat").addEventListener("click", (event) => {
+  event.preventDefault();
+});
+
+setSidebarClosed(localStorage.getItem("careerWithSandySidebarClosed") === "true");
+restoreSandyPosition();
+formatClock();
+setInterval(formatClock, 1000);
 load();
-if (!localStorage.getItem("careerWithSandySophiaPipelineImported")) {
+if (localStorage.getItem("careerWithSandySophiaPipelineVersion") !== (window.SOPHIA_PIPELINE_VERSION || "legacy")) {
   importSophiaPipeline({ silent: true });
 } else {
   render();

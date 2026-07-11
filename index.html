@@ -3,18 +3,23 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Career with Sandy</title>
+    <title>Job Hunting with Sandy</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <div class="hydrangea-garden" aria-hidden="true"></div>
     <div class="app-shell">
+      <button class="menu-toggle" id="openSidebarButton" type="button">☰ Menu</button>
       <aside class="sidebar" aria-label="Primary">
-        <div class="brand">
-          <span class="brand-mark">S</span>
-          <div>
-            <h1>Career with Sandy</h1>
-            <p>Personal tracker</p>
+        <div class="sidebar-head">
+          <div class="brand">
+            <span class="brand-mark">S</span>
+            <div>
+              <h1>Job Hunting with Sandy</h1>
+              <p>Personal tracker</p>
+            </div>
           </div>
+          <button class="sidebar-close" id="closeSidebarButton" type="button" aria-label="Collapse sidebar">‹</button>
         </div>
 
         <nav class="nav-tabs" aria-label="Views">
@@ -45,8 +50,16 @@
       <main class="main">
         <header class="topbar">
           <div class="search-wrap">
-            <label for="searchInput">Search</label>
+            <label class="sr-only" for="searchInput">Search</label>
             <input id="searchInput" type="search" placeholder="Role, company, source, skill...">
+          </div>
+          <div class="search-wrap tag-filter-wrap">
+            <label class="sr-only" for="tagFilter">Tag</label>
+            <select id="tagFilter" aria-label="Filter by tag"></select>
+          </div>
+          <div class="clock-card" aria-live="polite">
+            <span>Today</span>
+            <strong id="dashboardClock">--</strong>
           </div>
         </header>
 
@@ -69,8 +82,6 @@
           </article>
         </section>
 
-        <section class="reminders" id="remindersPanel" aria-label="Follow up reminders"></section>
-
         <section class="view active" id="boardView" aria-label="Kanban board">
           <div class="board" id="board"></div>
         </section>
@@ -87,6 +98,8 @@
                   <th>Role</th>
                   <th>Company</th>
                   <th>Status</th>
+                  <th>Tags</th>
+                  <th>Countdown</th>
                   <th>Applied</th>
                   <th>CV</th>
                   <th>Next action</th>
@@ -120,7 +133,7 @@
         You are doing better than you think.
       </div>
       <button class="sandy-float" id="sandyFloat" type="button" aria-label="Ask Sandy for encouragement">
-        <img src="assets/sandy-illustrated.png" alt="">
+        <img src="assets/sandy-hydrangea-under.png" alt="">
       </button>
     </aside>
 
@@ -128,20 +141,41 @@
       <form method="dialog" id="jobForm">
         <div class="dialog-head">
           <h2 id="jobDialogTitle">New application</h2>
-          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+          <div class="dialog-head-actions">
+            <button class="primary-action compact-save" type="submit">Save</button>
+            <button class="icon-button dialog-cancel" type="button" aria-label="Close">x</button>
+          </div>
         </div>
         <input id="jobId" type="hidden">
         <div class="form-grid">
           <label>Role title<input id="role" required></label>
           <label>Company<input id="company" required></label>
-          <label>Job link<input id="jobLink" type="url" placeholder="https://"></label>
+          <label class="job-link-label">Job link
+            <span class="link-input-row">
+              <input id="jobLink" type="url" placeholder="https://">
+              <button class="secondary-action open-job-link" id="openJobLinkButton" type="button">Open link</button>
+            </span>
+          </label>
           <label>Source<input id="source" placeholder="LinkedIn, referral, company site"></label>
-          <label>Status<select id="status"></select></label>
+          <div class="form-field status-field">
+            <span>Status</span>
+            <input id="status" type="hidden" value="saved">
+            <div class="status-tag-row" id="statusTagRow" role="radiogroup" aria-label="Application status"></div>
+          </div>
           <label>Location<input id="location" placeholder="London, remote, hybrid"></label>
           <label>Salary<input id="salary" placeholder="Optional"></label>
           <label>Applied date<input id="appliedDate" type="date"></label>
           <label>Next action<input id="nextAction" placeholder="Follow up, tailor CV, prep interview"></label>
           <label>Next action date<input id="nextActionDate" type="date"></label>
+          <div class="form-field tag-builder-field">
+            <span>Priority / custom tags</span>
+            <input id="jobTags" type="hidden">
+            <div class="tag-builder-row">
+              <input id="tagEntry" placeholder="A+, interested, remote">
+              <button class="secondary-action add-tag-button" id="addTagButton" type="button">Add tag</button>
+            </div>
+            <div class="job-tag-chip-row" id="jobTagChips" aria-label="Saved tags"></div>
+          </div>
           <label>CV used for this application<select id="cvVersion"></select></label>
           <label>Contact<select id="contactId"></select></label>
         </div>
@@ -150,7 +184,7 @@
         <div class="dialog-actions">
           <button class="danger" id="deleteJobButton" type="button">Delete</button>
           <span></span>
-          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="secondary-action dialog-cancel" type="button">Cancel</button>
           <button class="primary-action" id="saveJobButton" value="default" type="submit">Save</button>
         </div>
       </form>
@@ -160,7 +194,7 @@
       <form method="dialog" id="cvForm">
         <div class="dialog-head">
           <h2>CV version</h2>
-          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+          <button class="icon-button dialog-cancel" type="button" aria-label="Close">x</button>
         </div>
         <input id="cvId" type="hidden">
         <div class="form-grid">
@@ -179,7 +213,7 @@
         <div class="dialog-actions">
           <button class="danger" id="deleteCvButton" type="button">Delete</button>
           <span></span>
-          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="secondary-action dialog-cancel" type="button">Cancel</button>
           <button class="primary-action" value="default" type="submit">Save CV</button>
         </div>
       </form>
@@ -189,7 +223,7 @@
       <form method="dialog" id="contactForm">
         <div class="dialog-head">
           <h2>Contact</h2>
-          <button class="icon-button" value="cancel" type="submit" aria-label="Close">x</button>
+          <button class="icon-button dialog-cancel" type="button" aria-label="Close">x</button>
         </div>
         <input id="personId" type="hidden">
         <div class="form-grid">
@@ -204,7 +238,7 @@
         <div class="dialog-actions">
           <button class="danger" id="deleteContactButton" type="button">Delete</button>
           <span></span>
-          <button class="secondary-action" value="cancel" type="submit">Cancel</button>
+          <button class="secondary-action dialog-cancel" type="button">Cancel</button>
           <button class="primary-action" value="default" type="submit">Save contact</button>
         </div>
       </form>
