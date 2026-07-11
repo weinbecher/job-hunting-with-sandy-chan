@@ -8,6 +8,6 @@
 // Find these in: Supabase dashboard -> Project Settings -> API.
 
 window.SUPABASE_CONFIG = {
-  url: "https://lqhqqsiodqlamxymobgr.supabase.co",
+  url: "https://lqhqqsiodqlamxymobgr.supabase.co/rest/v1/",
   anonKey: "sb_publishable_v2KmwXKXisqqCSTubPhsEA_W3AGqaWGeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxaHFxc2lvZHFsYW14eW1vYmdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NzE2ODMsImV4cCI6MjA5OTM0NzY4M30.4rPDwRrJlaOB1lF1q9D6WWGEpl2Ef0yM7sH8_QDaUDk"
 };
