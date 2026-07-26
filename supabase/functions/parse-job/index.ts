@@ -21,6 +21,12 @@ const MAX_PAGE_CHARS = 40000;
 const MAX_RESPONSE_BYTES = 5_000_000;
 const FETCH_TIMEOUT_MS = 15000;
 
+// Enough text to be worth sending to the model, and the floor below which a page
+// is not worth reading at all. Between the two we send what we have but still try
+// the fallbacks first.
+const GOOD_TEXT_CHARS = 600;
+const MIN_TEXT_CHARS = 200;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -112,29 +118,141 @@ function assertPublicUrl(raw: string): URL {
   return url;
 }
 
-// Turn a page of HTML into readable plain text. Deliberately simple — Claude copes well
-// with rough text, and a full DOM parse would be far more machinery than this needs.
-function htmlToText(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
+function decodeEntities(value: string): string {
+  return value
     .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
+    .replace(/&#0?39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&amp;/gi, "&");
+}
+
+function collapse(value: string): string {
+  return value
     .replace(/[ \t\r\f\v]+/g, " ")
     .replace(/\n\s*\n\s*\n+/g, "\n\n")
     .trim();
 }
 
-async function fetchPageText(url: URL): Promise<string> {
+// Turn a page of HTML into readable plain text. Deliberately simple — Claude copes well
+// with rough text, and a full DOM parse would be far more machinery than this needs.
+function htmlToText(html: string): string {
+  return collapse(
+    decodeEntities(
+      html
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, " ")
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<\/(p|div|li|h[1-6]|tr|section|article)>/gi, "\n")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+    )
+  );
+}
+
+// Pull <title> and the og:/twitter:/description meta tags. Many job sites render the
+// advert with JavaScript but still emit these server-side, so this is often the only
+// real content in the HTML. Attribute order varies, so each tag is read as a whole.
+function extractMetadata(html: string): string {
+  const lines: string[] = [];
+
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  if (title?.trim()) lines.push(`Page title: ${decodeEntities(title).trim()}`);
+
+  const meta: Record<string, string> = {};
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    const key = tag.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i)?.[1];
+    const content = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i)?.[1];
+    if (key && content) meta[key.toLowerCase()] = decodeEntities(content).trim();
+  }
+
+  for (const [key, label] of [
+    ["og:title", "Title"],
+    ["og:site_name", "Site"],
+    ["og:description", "Description"],
+    ["twitter:description", "Description"],
+    ["description", "Description"]
+  ] as const) {
+    if (meta[key]) lines.push(`${label}: ${meta[key]}`);
+  }
+
+  return [...new Set(lines)].join("\n");
+}
+
+// schema.org JobPosting embedded as JSON-LD. Where a site provides it this is the
+// richest and most reliable source — it is structured data meant for exactly this.
+function extractJsonLdJob(html: string): string {
+  const blocks =
+    html.match(
+      /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+    ) || [];
+
+  for (const block of blocks) {
+    const raw = block.replace(/^[\s\S]*?>/, "").replace(/<\/script>$/i, "");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+
+    // JSON-LD may be a single object, an array, or nested under @graph.
+    const candidates: Record<string, unknown>[] = [];
+    const visit = (node: unknown) => {
+      if (Array.isArray(node)) node.forEach(visit);
+      else if (node && typeof node === "object") {
+        const obj = node as Record<string, unknown>;
+        candidates.push(obj);
+        if (obj["@graph"]) visit(obj["@graph"]);
+      }
+    };
+    visit(parsed);
+
+    const job = candidates.find((node) =>
+      String(node["@type"] ?? "").toLowerCase().includes("jobposting")
+    );
+    if (!job) continue;
+
+    const org = job.hiringOrganization as Record<string, unknown> | undefined;
+    const location = job.jobLocation as Record<string, unknown> | undefined;
+    const address = location?.address as Record<string, unknown> | undefined;
+    const salary = job.baseSalary as Record<string, unknown> | undefined;
+    const salaryValue = salary?.value as Record<string, unknown> | undefined;
+
+    const parts = [
+      job.title && `Title: ${job.title}`,
+      org?.name && `Company: ${org.name}`,
+      address &&
+        `Location: ${[address.addressLocality, address.addressRegion, address.addressCountry]
+          .filter(Boolean)
+          .join(", ")}`,
+      job.employmentType && `Employment type: ${job.employmentType}`,
+      salaryValue &&
+        `Salary: ${[salaryValue.minValue, salaryValue.maxValue, salary?.currency]
+          .filter(Boolean)
+          .join(" ")}`,
+      job.description && `Description: ${htmlToText(String(job.description))}`
+    ].filter(Boolean);
+
+    if (parts.length) return parts.join("\n");
+  }
+
+  return "";
+}
+
+// Combine every source of text the page offers, richest first.
+function buildText(html: string): string {
+  return collapse(
+    [extractJsonLdJob(html), extractMetadata(html), htmlToText(html)]
+      .filter(Boolean)
+      .join("\n\n")
+  );
+}
+
+async function fetchHtml(url: URL): Promise<string> {
   const response = await fetch(url.toString(), {
     redirect: "follow",
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -147,9 +265,7 @@ async function fetchPageText(url: URL): Promise<string> {
     }
   });
 
-  if (!response.ok) {
-    throw new Error(`The site returned ${response.status}.`);
-  }
+  if (!response.ok) throw new Error(`The site returned ${response.status}.`);
 
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("html") && !contentType.includes("text")) {
@@ -157,16 +273,41 @@ async function fetchPageText(url: URL): Promise<string> {
   }
 
   const body = await response.text();
-  if (body.length > MAX_RESPONSE_BYTES) {
-    throw new Error("That page is too large to read.");
-  }
+  if (body.length > MAX_RESPONSE_BYTES) throw new Error("That page is too large to read.");
+  return body;
+}
 
-  const text = htmlToText(body);
-  if (text.length < 200) {
-    // Usually means the advert is rendered by JavaScript, or we hit a login wall.
-    throw new Error("The page loaded but contained no readable job text.");
+// Lots of company career pages are Greenhouse behind the scenes and render the advert
+// with JavaScript, leaving almost nothing in the HTML — but the job id sits in the URL.
+// This embed endpoint resolves the board itself, so no board name is needed.
+async function fetchGreenhouseText(url: URL): Promise<string> {
+  const id = url.pathname.match(/(\d{6,})/)?.[1];
+  if (!id) return "";
+  try {
+    const html = await fetchHtml(
+      new URL(`https://boards.greenhouse.io/embed/job_app?token=${id}`)
+    );
+    const text = buildText(html);
+    return text.length >= GOOD_TEXT_CHARS ? text : "";
+  } catch {
+    return "";
   }
-  return text;
+}
+
+async function fetchPageText(url: URL): Promise<string> {
+  const pageText = buildText(await fetchHtml(url));
+  if (pageText.length >= GOOD_TEXT_CHARS) return pageText;
+
+  // Thin page — usually JavaScript-rendered. Try the job board behind it.
+  const boardText = await fetchGreenhouseText(url);
+  if (boardText) return boardText;
+
+  // Better a title and a summary than nothing.
+  if (pageText.length >= MIN_TEXT_CHARS) return pageText;
+
+  throw new Error(
+    "This page builds its content with JavaScript, so there was nothing to read."
+  );
 }
 
 async function extractJob(pageText: string, sourceHint: string) {

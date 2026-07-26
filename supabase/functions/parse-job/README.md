@@ -61,14 +61,25 @@ Run it from the repository root, with the CLI installed and linked to your proje
 2. Press **✨ Autofill**. The fields populate — nothing is saved yet.
 3. Check it over and press **Save**.
 
+### How it finds the job text
+
+Modern careers pages often build themselves with JavaScript, so the HTML that arrives is
+nearly empty. The function tries three sources, richest first:
+
+1. **JSON-LD** — many boards publish a machine-readable `JobPosting` block. Best case.
+2. **Page metadata** — the `<title>` and social-share description tags, which sites emit
+   server-side even when the body is rendered later.
+3. **The job board behind the page** — a lot of company careers sites are Greenhouse under
+   the hood, with the job id in the URL (e.g. `.../position/7738027003`). When the page
+   itself comes back thin, the function asks Greenhouse directly for the full advert.
+
+Only if all three come up empty does it offer the paste box.
+
 ### When a site blocks it
 
 LinkedIn and Indeed deliberately block automated page reading. When that happens the app
 says so and shows a **paste box** — copy the job description text from the page, paste it
 in, and press **Read pasted text**. Same result, one extra copy-paste.
-
-Sites that generally work directly: Greenhouse, Lever, Workable, SmartRecruiters, and most
-company careers pages.
 
 ## Notes
 
