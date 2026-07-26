@@ -256,6 +256,35 @@ export async function deleteContact(id) {
 }
 
 // ---------------------------------------------------------------------------
+// Job autofill. Calls the parse-job Edge Function, which reads a job advert and
+// returns its details as fields. The Anthropic API key lives there, never here —
+// this file ships to the browser and is readable by anyone.
+//
+// Pass a url to have the function fetch the page, or text when the site blocked
+// it and the user pasted the description instead.
+// ---------------------------------------------------------------------------
+
+export async function parseJob({ url = "", text = "" }) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.functions.invoke("parse-job", {
+    body: { url, text }
+  });
+  if (error) {
+    // Supabase wraps non-2xx responses; dig out the function's own message.
+    let message = error.message || "Autofill failed.";
+    try {
+      const body = await error.context?.json();
+      if (body?.error) message = body.error;
+    } catch {
+      // Keep the generic message if the body isn't readable.
+    }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  return data;
+}
+
+// ---------------------------------------------------------------------------
 // CV file storage. Objects are stored at "<userId>/<cvId>" so the storage RLS
 // policies (which check the first path segment) allow only the owner.
 // ---------------------------------------------------------------------------

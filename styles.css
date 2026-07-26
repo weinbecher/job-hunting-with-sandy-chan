@@ -678,9 +678,71 @@ form {
 
 .link-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
   align-items: center;
+}
+
+/* Autofill ----------------------------------------------------------------- */
+
+.autofill-button {
+  white-space: nowrap;
+}
+
+.autofill-button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.autofill-panel {
+  grid-column: 1 / -1;
+}
+
+.autofill-status {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.86rem;
+  color: var(--accent-strong);
+}
+
+.autofill-status.error {
+  color: var(--red);
+}
+
+.autofill-status:empty {
+  display: none;
+}
+
+.autofill-paste {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-line);
+  background: var(--glass);
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.autofill-paste[hidden] {
+  display: none;
+}
+
+.autofill-paste-label {
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+
+.autofill-paste textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-line);
+  background: var(--glass-strong);
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--ink);
+  resize: vertical;
 }
 
 .open-job-link {
@@ -972,6 +1034,10 @@ a {
 
   .link-input-row {
     grid-template-columns: 1fr;
+  }
+
+  .autofill-button {
+    width: 100%;
   }
 
   .table-toolbar,

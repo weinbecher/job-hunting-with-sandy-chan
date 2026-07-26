@@ -188,10 +188,22 @@
           <label class="job-link-label">Job link
             <span class="link-input-row">
               <input id="jobLink" type="url" placeholder="https://">
+              <button class="primary-action autofill-button" id="autofillButton" type="button">✨ Autofill</button>
               <button class="secondary-action open-job-link" id="openJobLinkButton" type="button">Open link</button>
             </span>
           </label>
           <label>Source<input id="source" placeholder="LinkedIn, referral, company site"></label>
+
+          <div class="form-field autofill-panel">
+            <p class="autofill-status" id="autofillStatus" role="status" aria-live="polite"></p>
+            <div class="autofill-paste" id="autofillPaste" hidden>
+              <label class="autofill-paste-label" for="autofillText">
+                Paste the job description here and Sandy will read it instead.
+              </label>
+              <textarea id="autofillText" rows="6" placeholder="Paste the full job advert text..."></textarea>
+              <button class="secondary-action" id="autofillTextButton" type="button">Read pasted text</button>
+            </div>
+          </div>
           <div class="form-field status-field">
             <span>Status</span>
             <input id="status" type="hidden" value="saved">

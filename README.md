@@ -14,6 +14,8 @@ project and the site is hosted for free on GitHub Pages.
 - Exports applications to CSV and imports CSV rows back into the tracker.
 - **Stores data in Supabase**, private to your signed-in account, so it syncs across devices.
 - **Uploads CV files to Supabase Storage** (private) so the actual documents travel with the records.
+- **Autofills a new application from a job link** — paste the URL, press ✨ Autofill, and the
+  role, company, location, salary and description fill themselves in for you to review.
 
 ## How it's built
 
@@ -25,6 +27,7 @@ Plain HTML/CSS/JavaScript — no build step. The Supabase JavaScript client load
 - `config.js` — your Supabase project URL and public anon key.
 - `seed-data.js` — the "Sophia pipeline" starter data used by the Import button.
 - `supabase/schema.sql` — the database tables, security rules, and storage bucket.
+- `supabase/functions/parse-job/` — the server-side function behind ✨ Autofill.
 
 ## First-time setup
 
@@ -73,6 +76,25 @@ rules that keep each account's data private, and the private `cv-files` storage 
    - **Import from this browser** — copies any data you had saved in this browser before the
      Supabase move (job/CV/contact records migrate; CV **files** must be re-uploaded).
 3. Add jobs, CV versions, and contacts. Everything saves to Supabase automatically.
+
+## Autofill from a job link (optional)
+
+Paste a job URL into a new application and press **✨ Autofill** to have the role, company,
+location, salary, source, description and tags filled in automatically. Nothing saves until
+you press Save, so you always review it first.
+
+This is the one part that isn't free: it uses the Anthropic API at roughly **1p per job**
+(no subscription — you add credit and it draws down). Setup takes two steps: create an API
+key, and deploy one function from the Supabase dashboard.
+
+**Full instructions: [`supabase/functions/parse-job/README.md`](supabase/functions/parse-job/README.md)**
+
+Until it's set up, the button is simply there and reports that autofill isn't configured —
+everything else in the app works exactly as before.
+
+> LinkedIn and Indeed block automated page reading. When that happens the app offers a
+> paste box so you can paste the description text instead. Greenhouse, Lever, Workable and
+> most company careers pages work directly from the link.
 
 ### Run locally
 

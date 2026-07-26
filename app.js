@@ -610,6 +610,81 @@ function fillJobForm(job = {}) {
   document.querySelector("#description").value = job.description || "";
   document.querySelector("#notes").value = job.notes || "";
   document.querySelector("#deleteJobButton").style.visibility = job.id ? "visible" : "hidden";
+  resetAutofill();
+}
+
+// --- Autofill from the job link -------------------------------------------
+
+function resetAutofill() {
+  setAutofillStatus("");
+  document.querySelector("#autofillPaste").hidden = true;
+  document.querySelector("#autofillText").value = "";
+}
+
+function setAutofillStatus(message, isError = false) {
+  const status = document.querySelector("#autofillStatus");
+  status.textContent = message;
+  status.classList.toggle("error", isError);
+}
+
+// Writes the parsed details onto the open form. Deliberately leaves the job id,
+// status, dates, CV, contact and notes alone — those are the user's own workflow
+// data, not facts from the advert. Nothing is saved here; the user still reviews
+// the form and presses Save.
+function applyParsedJob(parsed) {
+  const filled = [];
+  const setField = (selector, value, label) => {
+    if (!value) return;
+    document.querySelector(selector).value = value;
+    filled.push(label);
+  };
+
+  setField("#role", parsed.role, "role");
+  setField("#company", parsed.company, "company");
+  setField("#location", parsed.location, "location");
+  setField("#salary", parsed.salary, "salary");
+  setField("#source", parsed.source, "source");
+  setField("#description", parsed.description, "description");
+
+  if (parsed.tags?.length) {
+    setJobTags(parseTags(tagsText(parsed.tags)));
+    filled.push("tags");
+  }
+
+  return filled;
+}
+
+async function runAutofill({ url = "", text = "" }) {
+  const button = document.querySelector("#autofillButton");
+  const textButton = document.querySelector("#autofillTextButton");
+  button.disabled = true;
+  textButton.disabled = true;
+  setAutofillStatus(url ? "Reading the job page..." : "Reading the pasted text...");
+
+  try {
+    const parsed = await data.parseJob({ url, text });
+
+    if (parsed?.blocked) {
+      // Common for LinkedIn/Indeed — offer the paste box rather than failing.
+      document.querySelector("#autofillPaste").hidden = false;
+      setAutofillStatus(`${parsed.reason} Paste the description below instead.`);
+      return;
+    }
+
+    const filled = applyParsedJob(parsed);
+    if (!filled.length) {
+      setAutofillStatus("Nothing recognisable found. Try pasting the description.", true);
+      document.querySelector("#autofillPaste").hidden = false;
+      return;
+    }
+    document.querySelector("#autofillPaste").hidden = true;
+    setAutofillStatus(`Filled ${filled.join(", ")}. Check it over, then Save.`);
+  } catch (error) {
+    setAutofillStatus(error.message || "Autofill failed.", true);
+  } finally {
+    button.disabled = false;
+    textButton.disabled = false;
+  }
 }
 
 function fillCvForm(cv = {}) {
@@ -722,6 +797,25 @@ document.querySelector("#addJobButton").addEventListener("click", () => {
 
 document.querySelector("#jobLink").addEventListener("input", (event) => {
   document.querySelector("#openJobLinkButton").disabled = !event.target.value.trim();
+});
+
+document.querySelector("#autofillButton").addEventListener("click", () => {
+  const value = document.querySelector("#jobLink").value.trim();
+  if (!value) {
+    setAutofillStatus("Add a job link first, then press Autofill.", true);
+    return;
+  }
+  const url = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  runAutofill({ url });
+});
+
+document.querySelector("#autofillTextButton").addEventListener("click", () => {
+  const text = document.querySelector("#autofillText").value.trim();
+  if (!text) {
+    setAutofillStatus("Paste the job description first.", true);
+    return;
+  }
+  runAutofill({ text });
 });
 
 document.querySelector("#openJobLinkButton").addEventListener("click", () => {
